@@ -1,0 +1,39 @@
+from pathlib import Path
+import shutil
+from datetime import datetime
+import time
+
+downloads = Path.home() / "Downloads"
+
+destinations = {
+    ".pdf": Path.home() / "Documents" / "PDF",
+    ".docx": Path.home() / "Documents" / "Word",
+    ".pptx": Path.home() / "Documents" / "Powerpoint",
+    ".zip": Path.home() / "Documents" / "ZIP",
+    ".png": Path.home() / "Pictures" / "Screenshots",
+    ".jpg": Path.home() / "Pictures" / "Image",
+    ".jpeg": Path.home() / "Pictures" / "Image",
+    ".mp4": Path.home() / "Videos" / "Captures",
+    ".gif": Path.home() / "Videos" / "Captures",
+}
+
+
+def organiser():
+    for destination in destinations.values():
+        destination.mkdir(parents=True, exist_ok=True)
+    for file in downloads.iterdir():
+        if file.is_file():
+            extension = file.suffix.lower()
+
+            if extension in destinations:
+                destination = destinations[extension]
+                shutil.move(file, destination / file.name)
+                print(f"{file.name} → {destination}")
+
+
+while True:
+    maintenant = datetime.now()
+    if maintenant.hour == 19 and maintenant.minute == 0:
+        organiser()
+        time.sleep(60)
+    time.sleep(10)
