@@ -28,9 +28,6 @@ def organiser():
             if extension in destinations:
                 destination = destinations[extension]
                 shutil.move(file, destination / file.name)
-                print(f"{file.name} → {destination}")
-
-
 while True:
     maintenant = datetime.now()
     if maintenant.hour == 19 and maintenant.minute == 0:
