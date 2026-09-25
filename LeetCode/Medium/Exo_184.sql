@@ -12,3 +12,5 @@ JOIN (
 ) AS MaxSalary
     ON Employee.departmentId = MaxSalary.departmentId
     AND Employee.salary = MaxSalary.max_salary;
+
+"Nom des départements, des employés et de leurs salaires maximums"
