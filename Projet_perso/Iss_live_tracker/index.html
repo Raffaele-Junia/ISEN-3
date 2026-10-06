@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>ISS Live Tracker</title>
+
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+
+    <div id="globe"></div>
+
+    <div class="panel">
+
+        <h1>🛰️ ISS Live Tracker</h1>
+
+        <button id="centerISS">
+            🛰️ Centrer sur l'ISS
+        </button>
+
+        <div id="status">
+            🟡 Connexion...
+        </div>
+
+        <div class="data">
+
+            <div class="box">
+                <span>Latitude</span>
+                <strong id="latitude">--</strong>
+            </div>
+
+            <div class="box">
+                <span>Longitude</span>
+                <strong id="longitude">--</strong>
+            </div>
+
+            <div class="box">
+                <span>Altitude</span>
+                <strong id="altitude">--</strong>
+            </div>
+
+            <div class="box">
+                <span>Vitesse</span>
+                <strong id="velocity">--</strong>
+            </div>
+
+        </div>
+
+        <p>
+            Dernière mise à jour :
+            <span id="updated">--</span>
+        </p>
+
+    </div>
+
+    <script src="https://unpkg.com/three"></script>
+    <script src="https://unpkg.com/globe.gl"></script>
+    <script src="script.js"></script>
+
+</body>
+</html>
