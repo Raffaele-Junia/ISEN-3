@@ -12,7 +12,7 @@ wheels = [
 ]
 
 [[package]]
-name = "tp4-secuguard"
+name = "tp4-securguard"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [

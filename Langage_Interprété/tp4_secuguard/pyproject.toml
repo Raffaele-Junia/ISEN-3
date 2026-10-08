@@ -1,7 +1,7 @@
 [project]
-name = "tp4-secuguard"
+name = "tp4-securguard"
 version = "0.1.0"
-description = "Add your description here"
+description = "Boîte à outils CLI de sécurité des mots de passe"
 readme = "README.md"
 authors = [
     { name = "Raffaele FARVACQUE", email = "raffaele.farvacque@student.junia.com" }
@@ -12,8 +12,12 @@ dependencies = [
 ]
 
 [project.scripts]
-tp4-secuguard = "tp4_secuguard:main"
+secuguard = "secuguard.main:main"
 
 [build-system]
 requires = ["uv_build>=0.12.23,<0.13.0"]
 build-backend = "uv_build"
+
+[tool.uv.build-backend]
+module-name = "secuguard"
+module-root = "src"
