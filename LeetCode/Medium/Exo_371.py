@@ -1,5 +1,5 @@
 class Solution:
-    def getSum(self, a: int, b: int) -> int:
+    def getSum(self, a, b):
         mask = 0xFFFFFFFF
         maxInt = 2**31
 
