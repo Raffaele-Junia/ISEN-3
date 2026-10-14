@@ -1,0 +1,20 @@
+{
+  "genere_le": "2026-10-15T01:45:21.754924",
+  "nb_commandes": 11,
+  "chiffre_affaires": {
+    "ht": 405.8,
+    "tva": 81.16,
+    "ttc": 486.96
+  },
+  "par_statut": {
+    "payee": 8,
+    "expediee": 2,
+    "annulee": 1
+  },
+  "alertes_stock": [
+    {
+      "ref": "HD-003",
+      "stock": 3
+    }
+  ]
+}
