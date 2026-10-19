@@ -1,0 +1,35 @@
+{
+  "fournisseur": "TechDistrib",
+  "mise_a_jour": "2026-10-01",
+  "produits": [
+    {
+      "ref": "KB-001",
+      "nom": "Clavier mecanique",
+      "prix": 59.90,
+      "stock": 12,
+      "categories": ["peripheriques", "clavier"],
+      "dimensions": {"largeur_cm": 44.0, "hauteur_cm": 4.0}
+    },
+    {
+      "ref": "MS-002",
+      "nom": "Souris sans fil",
+      "prix": 24.50,
+      "stock": 40,
+      "categories": ["peripheriques", "souris"]
+    },
+    {
+      "ref": "HD-003",
+      "nom": "Casque audio",
+      "prix": 89.00,
+      "stock": 3,
+      "categories": ["audio"],
+      "dimensions": {"largeur_cm": 18.0, "hauteur_cm": 20.0}
+    },
+    {
+      "ref": "CB-004",
+      "nom": "Cable USB-C 2m",
+      "prix": 9.90,
+      "stock": 100
+    }
+  ]
+}

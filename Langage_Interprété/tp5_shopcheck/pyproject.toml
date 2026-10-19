@@ -1,0 +1,20 @@
+[project]
+name = "tp5-shopcheck"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+authors = [
+    { name = "Raffaele FARVACQUE", email = "raffaele.farvacque@student.junia.com" }
+]
+requires-python = ">=3.14"
+dependencies = [
+    "pydantic>=2.14.1",
+    "pyyaml>=6.0.3",
+]
+
+[project.scripts]
+tp5-shopcheck = "tp5_shopcheck:main"
+
+[build-system]
+requires = ["uv_build>=0.12.23,<0.13.0"]
+build-backend = "uv_build"

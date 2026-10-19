@@ -1,0 +1,9 @@
+﻿id_commande,client_email,ref,quantite
+1001,alice.dubois@mail.com,KB-001,1
+1002,thomas.moreau@mail.fr,MS-002,2
+1003,lea.martin@mail.com,HD-003,1
+1004,hugo.bernard@mail.com,CB-004,1
+1005,emma.petit@mail.com,MS-002,1
+1007,zoe.girard@mail.com,KB-001,1
+1008,alice.dubois@mail.com,CB-004,2
+1010,paul.durand@mail.com,CB-004,4
