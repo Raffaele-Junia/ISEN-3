@@ -22,11 +22,11 @@ Avant de commencer, installez :
 Si vous utilisez Git :
 
 ```bash
-git clone URL_DU_DEPOT
+git clone https://github.com/Raffaele-Junia/ISEN-3/tree/main/Langage_Interpr%C3%A9t%C3%A9/mon_projet
 cd mon_projet
 ```
 
-Remplacez `URL_DU_DEPOT` par l'adresse réelle du dépôt Git.
+Remplacez `https://github.com/Raffaele-Junia/ISEN-3/tree/main/Langage_Interpr%C3%A9t%C3%A9/mon_projet` par l'adresse réelle du dépôt Git.
 
 Vous pouvez aussi télécharger le projet et ouvrir un terminal dans son dossier.
 
