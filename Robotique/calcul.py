@@ -38,3 +38,5 @@ T23 = dh_matrix(q3, 0,  a3,  0)
 T03 = sp.simplify(T01 * T12 * T23)
 
 sp.pprint(T03)
+
+print (T03)

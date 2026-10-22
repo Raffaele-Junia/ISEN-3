@@ -1,0 +1,20 @@
+[project]
+name = "mon-projet"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+authors = [
+    { name = "Raffaele FARVACQUE", email = "raffaele.farvacque@student.junia.com" }
+]
+requires-python = ">=3.14"
+dependencies = [
+    "python-dotenv>=1.2.4",
+    "requests>=2.34.2",
+]
+
+[project.scripts]
+mon-projet = "mon_projet:main"
+
+[build-system]
+requires = ["uv_build>=0.12.23,<0.13.0"]
+build-backend = "uv_build"
