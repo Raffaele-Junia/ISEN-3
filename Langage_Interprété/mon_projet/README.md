@@ -162,8 +162,6 @@ uv run python -m mon_projet.main recalls IDENTIFIANT
 uv run python -m mon_projet.main dtc P0420
 ```
 
-Pour les commandes 3 à 5, remplacez les identifiants par ceux obtenus lors de vos propres recherches.
-
 ## Dépannage
 
 **Erreur : clé API manquante**
@@ -191,19 +189,3 @@ Vérifiez également que le package est correctement configuré dans `pyproject.
 **Aucun véhicule trouvé**
 
 Essayez une recherche plus générale, sans année ni modèle, ou vérifiez les paramètres utilisés.
-
-## Technologies utilisées
-
-- Python
-- uv
-- Requests
-- python-dotenv
-- API CarVector
-
-## Licence
-
-Précisez ici la licence de votre choix avant de publier le projet.
-
-## Avertissement
-
-AutoScope est un projet d'exploration de données automobiles. Les données dépendent de l'API CarVector et de ses disponibilités. Les informations de rappel et de diagnostic ne remplacent pas les informations officielles du constructeur ni l'avis d'un professionnel.
