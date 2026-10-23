@@ -1,0 +1,388 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#080d18">
+    <title>Historique — CyberScope</title>
+
+    <style>
+        :root {
+            --bg: #080d18;
+            --panel: #0d1422;
+            --text: #e9edf3;
+            --text-soft: #b4bdcb;
+            --muted: #78859a;
+            --line: #1c283a;
+            --line-strong: #304057;
+            --accent: #78baff;
+            --green: #6ee7b7;
+            --yellow: #fcd34d;
+            --red: #fb7185;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            background: var(--bg);
+            color: var(--text);
+            font-family: Inter, -apple-system, BlinkMacSystemFont,
+                         "Segoe UI", sans-serif;
+            line-height: 1.6;
+        }
+
+        a {
+            color: inherit;
+            text-decoration: none;
+        }
+
+        .container {
+            width: min(1100px, calc(100% - 40px));
+            margin: 0 auto;
+        }
+
+        .masthead {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 20px;
+            padding: 24px 0;
+            border-bottom: 1px solid var(--line);
+        }
+
+        .brand {
+            font-size: 20px;
+            font-weight: 750;
+            letter-spacing: -0.7px;
+        }
+
+        .brand span {
+            color: var(--accent);
+        }
+
+        .back-link {
+            color: var(--accent);
+            font-size: 14px;
+            font-weight: 600;
+        }
+
+        .back-link:hover {
+            color: white;
+        }
+
+        .intro {
+            padding: 54px 0 30px;
+        }
+
+        .eyebrow {
+            color: var(--accent);
+            font-size: 11px;
+            font-weight: 800;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+        }
+
+        h1 {
+            margin: 12px 0;
+            font-size: clamp(32px, 5vw, 48px);
+            line-height: 1.1;
+            letter-spacing: -1.8px;
+        }
+
+        .subtitle {
+            max-width: 620px;
+            color: var(--text-soft);
+            font-size: 15px;
+        }
+
+        .panel {
+            overflow: hidden;
+            margin: 20px 0 50px;
+            border: 1px solid var(--line);
+            border-radius: 14px;
+            background: var(--panel);
+        }
+
+        .panel-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 15px;
+            padding: 20px 24px;
+            border-bottom: 1px solid var(--line);
+        }
+
+        .panel-header h2 {
+            margin: 0;
+            font-size: 16px;
+            font-weight: 700;
+        }
+
+        .count {
+            color: var(--muted);
+            font-size: 12px;
+        }
+
+        .table-wrapper {
+            overflow-x: auto;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            text-align: left;
+            white-space: nowrap;
+        }
+
+        th {
+            padding: 13px 20px;
+            color: var(--muted);
+            font-size: 10px;
+            font-weight: 800;
+            letter-spacing: 1.2px;
+            text-transform: uppercase;
+            background: #0a1120;
+        }
+
+        td {
+            padding: 17px 20px;
+            border-top: 1px solid var(--line);
+            color: var(--text-soft);
+            font-size: 13px;
+        }
+
+        tbody tr {
+            transition: background 0.15s ease;
+        }
+
+        tbody tr:hover {
+            background: #111c2d;
+        }
+
+        .id {
+            color: var(--muted);
+            font-family: monospace;
+        }
+
+        .url {
+            display: inline-block;
+            max-width: 330px;
+            overflow: hidden;
+            color: var(--text);
+            text-overflow: ellipsis;
+            vertical-align: middle;
+        }
+
+        .url:hover {
+            color: var(--accent);
+        }
+
+        .score {
+            font-weight: 800;
+            font-variant-numeric: tabular-nums;
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 4px 9px;
+            border: 1px solid var(--line-strong);
+            border-radius: 20px;
+            font-size: 11px;
+            font-weight: 700;
+        }
+
+        .risk-critical,
+        .risk-high {
+            color: var(--red);
+            border-color: #63303e;
+            background: #29151e;
+        }
+
+        .risk-moderate {
+            color: var(--yellow);
+            border-color: #66552a;
+            background: #282213;
+        }
+
+        .risk-low {
+            color: var(--accent);
+            border-color: #294b70;
+            background: #122238;
+        }
+
+        .risk-safe {
+            color: var(--green);
+            border-color: #245846;
+            background: #10271f;
+        }
+
+        .empty {
+            padding: 60px 24px;
+            text-align: center;
+        }
+
+        .empty h3 {
+            margin: 0 0 8px;
+            font-size: 18px;
+        }
+
+        .empty p {
+            margin: 0 auto 22px;
+            max-width: 420px;
+            color: var(--muted);
+            font-size: 14px;
+        }
+
+        .button {
+            display: inline-block;
+            padding: 11px 17px;
+            border-radius: 8px;
+            background: var(--accent);
+            color: #07111f;
+            font-size: 13px;
+            font-weight: 800;
+            transition: opacity 0.15s ease;
+        }
+
+        .button:hover {
+            opacity: 0.85;
+        }
+
+        footer {
+            padding: 20px 0 30px;
+            border-top: 1px solid var(--line);
+            color: var(--muted);
+            font-size: 12px;
+        }
+
+        @media (max-width: 600px) {
+            .container {
+                width: calc(100% - 28px);
+            }
+
+            .intro {
+                padding-top: 38px;
+            }
+
+            .panel-header {
+                padding: 17px;
+            }
+
+            th, td {
+                padding: 13px 15px;
+            }
+
+            .url {
+                max-width: 190px;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <header class="masthead">
+            <a class="brand" href="/">Cyber<span>Scope</span></a>
+            <a class="back-link" href="/">← Retour à l'analyse</a>
+        </header>
+
+        <main>
+            <section class="intro">
+                <div class="eyebrow">Suivi & rapports</div>
+                <h1>Historique des analyses.</h1>
+                <p class="subtitle">
+                    Retrouvez les URL analysées, leur niveau de risque
+                    et les résultats enregistrés par CyberScope.
+                </p>
+            </section>
+
+            <section class="panel">
+                <div class="panel-header">
+                    <h2>Analyses enregistrées</h2>
+                    <span class="count">
+                        {{ analyses | length }} résultat(s) affiché(s)
+                    </span>
+                </div>
+
+                {% if analyses %}
+                <div class="table-wrapper">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>URL analysée</th>
+                                <th>Niveau de risque</th>
+                                <th>Score</th>
+                                <th>Date</th>
+                            </tr>
+                        </thead>
+
+                        <tbody>
+                            {% for analysis in analyses %}
+                            {% set level = analysis.risk_level | lower %}
+                            {% if level == "critique" %}
+                                {% set risk_class = "risk-critical" %}
+                            {% elif level == "élevé" or level == "eleve" %}
+                                {% set risk_class = "risk-high" %}
+                            {% elif level == "modéré" or level == "modere" %}
+                                {% set risk_class = "risk-moderate" %}
+                            {% elif level == "faible" %}
+                                {% set risk_class = "risk-low" %}
+                            {% else %}
+                                {% set risk_class = "risk-safe" %}
+                            {% endif %}
+
+                            <tr>
+                                <td class="id">#{{ analysis.id }}</td>
+
+                                <td>
+                                    <a
+                                        class="url"
+                                        href="/history/{{ analysis.id }}"
+                                        title="{{ analysis.url }}"
+                                    >
+                                        {{ analysis.url }}
+                                    </a>
+                                </td>
+
+                                <td>
+                                    <span class="badge {{ risk_class }}">
+                                        {{ analysis.risk_level }}
+                                    </span>
+                                </td>
+
+                                <td class="score">
+                                    {{ analysis.risk_score }}/100
+                                </td>
+
+                                <td>
+                                    {{ analysis.created_at | replace("T", " ") | replace("+00:00", " UTC") }}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+
+                {% else %}
+                <div class="empty">
+                    <h3>Aucune analyse pour le moment.</h3>
+                    <p>
+                        Les analyses que vous effectuerez seront enregistrées
+                        ici pour vous permettre de les consulter ultérieurement.
+                    </p>
+                    <a class="button" href="/">Analyser une URL →</a>
+                </div>
+                {% endif %}
+            </section>
+        </main>
+
+        <footer>
+            CyberScope · Outil d'analyse de réputation d'URL
+        </footer>
+    </div>
+</body>
+</html>
