@@ -5,9 +5,14 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+
 def main():
     if len(sys.argv) != 2:
-        sys.exit("Missing command-line argument" if len(sys.argv) < 2 else "Too many arguments")
+        sys.exit(
+            "Missing command-line argument"
+            if len(sys.argv) < 2
+            else "Too many arguments"
+        )
 
     try:
         amount = float(sys.argv[1])
@@ -23,7 +28,7 @@ def main():
         response = requests.get(
             "https://rest.coincap.io/v3/assets/bitcoin",
             params={"apiKey": api_key},
-            timeout=10
+            timeout=10,
         )
         response.raise_for_status()
 
@@ -34,6 +39,7 @@ def main():
 
     except (requests.RequestException, KeyError, ValueError):
         sys.exit("Could not retrieve Bitcoin price")
+
 
 if __name__ == "__main__":
     main()
