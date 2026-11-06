@@ -14,10 +14,10 @@ class Document(ABC):
         self.annee = annee
         self._extra = extra
 
-    def __init_subclass__(cls,**kwargs):
-        super().__init__(**kwargs)
+    def __init_subclass__(cls, **kwargs):
+        super().__init_subclass__(**kwargs)
         if cls.CLE != "?":
-            Document._registre[cls.CLE]=cls
+            Document._registre[cls.CLE] = cls
 
     @property
     @abstractmethod
@@ -76,3 +76,73 @@ class Document(ABC):
 
     def __repr__(self):
         return f"{type(self).__name__}({self.id!r}, {self.titre!r}, {self.annee!r})"
+
+
+class Livre(Document):
+
+    TYPE = "Livre"
+    CLE = "livre"
+
+    def __init__(self,id,titre,annee,auteur):
+        super().__init__(id,titre,annee,auteur)
+
+    @property
+    def auteur(self):
+        return self._extra
+
+    @property
+    def duree_pret_jour(self):
+        return 21
+
+    @property
+    def detail(self):
+        return self.auteur
+
+    @classmethod
+    def from_extra(cls, extra):
+        return extra
+
+class DVD(Document):
+    TYPE = "DVD"
+    CLE = "dvd"
+
+    def __init__(self,id,titre,annee,duree_min):
+        super().__init__(id,titre,annee,duree_min)
+
+    def duree_min(self):
+        return self._extra
+
+    @property
+    def duree_pret_jour(self):
+        return 7
+
+    @property
+    def detail(self):
+        return f"{self.duree_min} min"
+
+    @classmethod
+    def from_extra(cls, extra):
+        return int(extra)
+
+class Revue(Document):
+    TYPE = "Revue"
+    CLE = "revue"
+
+    def __init__(self,id,titre,annee,numero):
+        super().__init__(id,titre,annee,numero)
+
+    @property
+    def numero(self):
+        return self._extra
+
+    @property
+    def duree_pret_jour(self):
+        return 7
+
+    @property
+    def detail(self):
+        return f"n {self.numero}"
+
+    @classmethod
+    def from_extra(cls, extra):
+        return int(extra)

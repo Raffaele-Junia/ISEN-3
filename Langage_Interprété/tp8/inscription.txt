@@ -1,0 +1,5 @@
+Martin ; Lucas ; groupe_B
+Dupont ; Alice ; groupe_A
+Benali ; Yanis ; groupe_A
+Leroy ; Emma ; groupe_B
+Ahmed ; Sara ; groupe_A
