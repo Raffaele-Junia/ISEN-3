@@ -109,6 +109,7 @@ class DVD(Document):
     def __init__(self,id,titre,annee,duree_min):
         super().__init__(id,titre,annee,duree_min)
 
+    @property
     def duree_min(self):
         return self._extra
 
