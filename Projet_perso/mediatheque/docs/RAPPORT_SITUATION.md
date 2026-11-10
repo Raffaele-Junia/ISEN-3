@@ -2,6 +2,8 @@
 
 *État au 10/11/2026, version 0.1.0*
 
+> **Avancement :** P0 terminé (bugs B1 à B4 et B7 corrigés). P1 terminé (SQLite, comptes et rôles, réservations ; B5 corrigé). Décisions prises : les réservations ont leur propre limite (3 actives), séparée du quota d'emprunts, et un document reste mis de côté 3 jours. Prochaine étape : P2 (interface graphique).
+
 ## 1. Ce qui existe
 
 | Module | Rôle | État |
