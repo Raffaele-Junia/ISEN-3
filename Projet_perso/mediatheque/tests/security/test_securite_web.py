@@ -183,14 +183,31 @@ def test_w2_valeurs_par_defaut():
     assert module_app.INACTIVITE_S == 30 * 60 and module_app.DUREE_MAX_S == 12 * 3600
 
 
-@pytest.mark.xfail(strict=True, reason="faille W3 : sessions_actives n'est jamais purge ; "
-                   "une session revoquee ou abandonnee y reste tant que son cookie ne revient pas")
 def test_w3_session_revoquee_purgee_du_registre(web_app, web_admin, web_lea):
     sessions = variable_interne(web_app, "sessions_actives")
     poster(web_admin, "/admin/comptes/mot-de-passe", page="/admin/gestion?onglet=adherents",
            identifiant="lea", mot_de_passe="Reinit1234")
     client_connecte(web_app, "ines")  # activite ordinaire du site
     assert not [s for s in sessions.values() if s.compte.identifiant == "lea"]
+
+
+def test_w3_cinq_sessions_au_plus_par_compte(web_app):
+    sessions = variable_interne(web_app, "sessions_actives")
+    clients = [client_connecte(web_app, "lea") for _ in range(7)]
+    assert len([s for s in sessions.values() if s.compte.identifiant == "lea"]) == 5
+    # les deux plus anciennes ont ete fermees, les cinq plus recentes restent valides
+    assert [c.get("/catalogue").status_code for c in clients] == [302] * 2 + [200] * 5
+
+
+def test_w3_session_expiree_purgee_a_la_connexion_suivante(web_db, monkeypatch):
+    horloge = _Horloge()
+    monkeypatch.setattr(time, "monotonic", horloge)
+    app = create_app(web_db, secret_key="test", testing=True, inactivite_s=60)
+    sessions = variable_interne(app, "sessions_actives")
+    client_connecte(app, "lea")      # navigateur abandonne : le cookie ne revient jamais
+    horloge.t += 61
+    client_connecte(app, "ines")
+    assert [s.compte.identifiant for s in sessions.values()] == ["ines"]
 
 
 def test_w3_constat_croissance_du_registre(web_app):

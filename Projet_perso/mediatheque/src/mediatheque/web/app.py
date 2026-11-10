@@ -86,7 +86,8 @@ TENTATIVES_PAR_IP = 10       # tentatives de connexion par adresse...
 FENETRE_IP_S = 60            # ...sur une fenetre glissante d'une minute
 INACTIVITE_S = 30 * 60       # session fermee apres 30 min sans requete
 DUREE_MAX_S = 12 * 3600      # et dans tous les cas 12 h apres la connexion
-MESSAGE_EXPIRATION = "session expirée, reconnectez-vous"
+SESSIONS_PAR_COMPTE = 5     # au-dela, la plus ancienne session du compte est fermee
+MESSAGE_EXPIRATION ="session expirée, reconnectez-vous"
 
 
 class LimiteParIP:
@@ -177,7 +178,21 @@ def create_app(db, secret_key=None, testing=False, *,
         if s is not None:
             s.fermer()
 
+    def purger(identifiant):
+        """A chaque connexion (W3) : retire les sessions expirees ou revoquees,
+        et ne garde que les SESSIONS_PAR_COMPTE - 1 plus recentes du compte
+        qui se connecte (la plus ancienne est fermee)."""
+        maintenant = time.monotonic()
+        for jeton, s in list(sessions_actives.items()):
+            if expiree(jeton, maintenant) or not compte_enregistre(s.compte):
+                retirer(jeton)
+        miennes = sorted((horodatage[j][0], j) for j, s in sessions_actives.items()
+                         if s.compte.identifiant == identifiant)
+        for _, jeton in miennes[:max(0, len(miennes) - SESSIONS_PAR_COMPTE + 1)]:
+            retirer(jeton)
+
     def enregistrer(s):
+        purger(s.compte.identifiant)
         jeton = secrets.token_urlsafe(32)
         maintenant = time.monotonic()
         sessions_actives[jeton] = s
@@ -308,9 +323,10 @@ def create_app(db, secret_key=None, testing=False, *,
             else:
                 limite_ip.oublier(adresse, tentative)  # une reussite ne compte pas
                 ancien = session.pop("jeton", None)
-                retirer(ancien)
                 session.clear()  # nouvelle session : evite la fixation de session
-                session["jeton"] = enregistrer(s)
+                with verrou:  # registre partage entre les threads
+                    retirer(ancien)
+                    session["jeton"] = enregistrer(s)
                 session["csrf"] = secrets.token_urlsafe(32)
                 return redirect(url_for("accueil"))
         else:
