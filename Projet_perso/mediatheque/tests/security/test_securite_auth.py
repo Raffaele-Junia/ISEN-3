@@ -93,8 +93,8 @@ def test_changer_mot_de_passe_soumis_au_blocage(comptes):
 
 
 def test_s5_un_second_responsable_peut_debloquer(m):
-    """S5 (risque residuel, pas de xfail) : n'importe qui peut bloquer le
-    responsable ; seul remede actuel : un 2e responsable reinitialise le mdp."""
+    """S5 : le delai progressif est plafonne (DELAI_MAX_S) ; un 2e responsable
+    peut en plus debloquer immediatement en reinitialisant le mot de passe."""
     m.creer_compte("admin", MDP, RESPONSABLE)
     m.creer_compte("admin2", MDP, RESPONSABLE)
     for _ in range(MAX_ECHECS):
@@ -104,6 +104,64 @@ def test_s5_un_second_responsable_peut_debloquer(m):
         ouvrir_session(m, "admin", MDP)
     ouvrir_session(m, "admin2", MDP).reinitialiser_mot_de_passe("admin", "Neuf12345")
     assert ouvrir_session(m, "admin", "Neuf12345").est_responsable
+
+
+# ------------------------------------------ S5 : delai progressif (backoff)
+def _echouer(comptes, n, identifiant="lea"):
+    for _ in range(n):
+        with pytest.raises(AuthentificationError):
+            comptes.authentifier(identifiant, "Mauvais123")
+
+
+def test_s5_delai_progressif_puis_plafonne(comptes, horloge):
+    _echouer(comptes, MAX_ECHECS)
+    attentes = []
+    for _ in range(12):
+        with pytest.raises(CompteBloqueError) as e:
+            comptes.authentifier("lea", MDP)
+        attentes.append(e.value.secondes_restantes)
+        horloge.t += e.value.secondes_restantes
+        _echouer(comptes, 1)
+    assert attentes[:4] == [1, 2, 4, 8]
+    assert max(attentes) == auth.DELAI_MAX_S and attentes[-1] == auth.DELAI_MAX_S
+
+
+def test_s5_delai_non_contournable(comptes, horloge):
+    """Pendant le delai, tout essai est refuse (meme le bon mot de passe, meme
+    avec une autre casse) ; a l'expiration le compteur n'est pas remis a zero."""
+    _echouer(comptes, MAX_ECHECS)
+    for identifiant, mdp in (("lea", MDP), ("lea", "Mauvais123"), ("LEA ", MDP),
+                             (" Lea", "Mauvais123")):
+        with pytest.raises(CompteBloqueError):
+            comptes.authentifier(identifiant, mdp)
+    horloge.t += 1
+    _echouer(comptes, 1)
+    with pytest.raises(CompteBloqueError) as e:
+        comptes.authentifier("lea", MDP)
+    assert e.value.secondes_restantes == 2
+
+
+def test_s5_le_responsable_n_est_bloque_que_brievement(comptes, horloge):
+    """Un attaquant qui insiste en continu : le responsable attend au plus
+    DELAI_MAX_S apres le dernier essai de l'attaquant."""
+    for _ in range(50):
+        try:
+            comptes.authentifier("admin", "Mauvais123")
+        except CompteBloqueError as e:
+            horloge.t += e.secondes_restantes
+        except AuthentificationError:
+            pass
+    horloge.t += auth.DELAI_MAX_S
+    assert comptes.authentifier("admin", MDP).role == RESPONSABLE
+
+
+def test_s5_compteurs_purges(comptes, horloge, monkeypatch):
+    monkeypatch.setattr(auth, "_MAX_SUIVIS", 10)
+    for i in range(10):
+        _echouer(comptes, 1, f"inconnu{i}")
+    horloge.t += auth.OUBLI_S + 1
+    _echouer(comptes, 1, "encore")
+    assert list(comptes._echecs) == ["encore"]
 
 
 # --------------------------------------------- S6 : cout scrypt insuffisant

@@ -5,10 +5,13 @@
 - Comparaison en temps constant (hmac.compare_digest).
 - Message d'erreur identique que l'identifiant existe ou non, et hachage
   effectue meme pour un identifiant inconnu (pas de fuite par le temps).
-- Blocage temporaire apres plusieurs echecs.
+- Delai progressif par identifiant apres plusieurs echecs (1, 2, 4... s,
+  plafonne) : la force brute reste lente, sans qu'un tiers puisse bloquer
+  longtemps un compte (le responsable notamment).
 """
 import hashlib
 import hmac
+import math
 import re
 import secrets
 import time
@@ -20,8 +23,12 @@ ADHERENT = "adherent"
 RESPONSABLE = "responsable"
 ROLES = (ADHERENT, RESPONSABLE)
 
-MAX_ECHECS = 5
-DUREE_BLOCAGE_S = 300
+MAX_ECHECS = 5            # echecs consecutifs tolores sans delai
+DELAI_BASE_S = 1          # delai apres le MAX_ECHECS-ieme echec, double ensuite
+DELAI_MAX_S = 60          # plafond du delai
+DUREE_BLOCAGE_S = DELAI_MAX_S  # attente maximale (nom historique)
+OUBLI_S = 3600            # compteur oublie apres 1 h sans echec
+_MAX_SUIVIS = 10_000      # au-dela, purge des compteurs perimes
 _SCRYPT = {"n": 2**14, "r": 8, "p": 1, "dklen": 32}
 _FORMAT_IDENTIFIANT = re.compile(r"[a-z0-9._-]{3,32}")
 
@@ -60,7 +67,7 @@ class GestionComptes:
 
     def __init__(self, horloge=time.monotonic):
         self._comptes = {}
-        self._echecs = {}  # identifiant -> (nb_echecs, bloque_jusqu_a)
+        self._echecs = {}  # identifiant -> (nb_echecs, bloque_jusqu_a, dernier_echec)
         self._horloge = horloge
         self._sel_leurre = secrets.token_bytes(16)
 
@@ -103,9 +110,12 @@ class GestionComptes:
     def authentifier(self, identifiant, mot_de_passe):
         identifiant = identifiant.strip().lower()
         maintenant = self._horloge()
-        nb, bloque_jusqu_a = self._echecs.get(identifiant, (0, 0.0))
+        nb, bloque_jusqu_a, dernier = self._echecs.get(identifiant, (0, 0.0, 0.0))
         if bloque_jusqu_a > maintenant:
-            raise CompteBloqueError(int(bloque_jusqu_a - maintenant) + 1)
+            # refuse meme le bon mot de passe ; la tentative n'est pas comptee
+            raise CompteBloqueError(math.ceil(bloque_jusqu_a - maintenant))
+        if nb and maintenant - dernier > OUBLI_S:
+            nb = 0
 
         compte = self._comptes.get(identifiant)
         sel = compte.sel if compte else self._sel_leurre
@@ -115,11 +125,18 @@ class GestionComptes:
             return compte
 
         nb += 1
+        delai = 0.0
         if nb >= MAX_ECHECS:
-            self._echecs[identifiant] = (0, maintenant + DUREE_BLOCAGE_S)
-        else:
-            self._echecs[identifiant] = (nb, 0.0)
+            delai = min(DELAI_BASE_S * 2 ** (nb - MAX_ECHECS), DELAI_MAX_S)
+        self._echecs[identifiant] = (nb, maintenant + delai, maintenant)
+        if len(self._echecs) > _MAX_SUIVIS:
+            self._purger(maintenant)
         raise AuthentificationError()
+
+    def _purger(self, maintenant):
+        """Oublie les compteurs sans echec depuis OUBLI_S (memoire bornee)."""
+        self._echecs = {i: e for i, e in self._echecs.items()
+                        if maintenant - e[2] <= OUBLI_S}
 
     def changer_mot_de_passe(self, identifiant, ancien, nouveau):
         compte = self.authentifier(identifiant, ancien)
