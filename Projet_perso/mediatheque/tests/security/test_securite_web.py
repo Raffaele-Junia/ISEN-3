@@ -71,16 +71,21 @@ def test_ancien_jeton_csrf_refuse_apres_connexion(web_app):
 def test_csrf_compare_en_temps_constant():
     source = (module_app.__file__)
     texte = open(source, encoding="utf-8").read()
-    assert "compare_digest(envoye, session[\"csrf\"])" in texte
+    # W6 : comparaison en octets (toujours en temps constant)
+    assert "compare_digest(envoye.encode(), session[\"csrf\"].encode())" in texte
 
 
-@pytest.mark.xfail(strict=True, reason="faille W6 : jeton CSRF non ASCII -> TypeError "
-                   "dans secrets.compare_digest -> erreur 500 au lieu de 400")
 def test_w6_jeton_csrf_non_ascii_donne_400(web_app_prod):
     c = web_app_prod.test_client()
     jeton_csrf(c)
     r = c.post("/connexion", data={"identifiant": "lea", "mot_de_passe": MDP,
                                    "csrf": "é" * 43})
+    assert r.status_code == 400
+
+
+def test_w6_jeton_non_ascii_refuse_meme_connecte(web_app_prod):
+    c = client_connecte(web_app_prod, "lea")
+    r = c.post("/reserver/D001", data={"csrf": "☃" * 43})
     assert r.status_code == 400
 
 

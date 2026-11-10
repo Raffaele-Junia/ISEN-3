@@ -271,7 +271,8 @@ def create_app(db, secret_key=None, testing=False, *,
             session["csrf"] = secrets.token_urlsafe(32)
         if request.method == "POST":
             envoye = request.form.get("csrf", "")
-            if not secrets.compare_digest(envoye, session["csrf"]):
+            # en octets : compare_digest(str, str) leve TypeError hors ASCII (W6)
+            if not secrets.compare_digest(envoye.encode(), session["csrf"].encode()):
                 abort(400, "jeton CSRF invalide")
 
     @app.after_request
