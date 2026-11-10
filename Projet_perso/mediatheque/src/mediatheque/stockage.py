@@ -4,19 +4,19 @@ from .adherents import Adherent
 from .emprunt import Emprunt
 
 def lire_documents(chemin):
-    with open(chemin) as f:
+    with open(chemin, encoding="utf-8", newline="") as f:
         reader = csv.DictReader(f)
         for ligne in reader:
             yield(Document.from_csv_row(ligne))
 
 def lire_adherents(chemin):
-    with open(chemin) as f:
+    with open(chemin, encoding="utf-8", newline="") as f:
         reader = csv.DictReader(f)
         for ligne in reader:
             yield(Adherent.from_csv_row(ligne))
 
 def lire_emprunts(chemin):
-    with open(chemin) as f:
+    with open(chemin, encoding="utf-8", newline="") as f:
         reader = csv.DictReader(f)
         for ligne in reader:
             yield(Emprunt.from_csv_row(ligne))

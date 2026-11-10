@@ -1,2 +1,3 @@
 def main() -> None:
-    print("Hello from mediatheque!")
+    from .main import main as _main
+    _main()
