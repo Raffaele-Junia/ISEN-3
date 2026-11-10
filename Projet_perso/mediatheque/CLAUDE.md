@@ -8,7 +8,8 @@ Plan détaillé et priorités : `docs/RAPPORT_SITUATION.md`. **Mettre à jour la
 ## Stack
 - Python **3.14**, paquet géré par **uv** (`uv_build`), disposition `src/`. Seule dépendance d'exécution : **Flask**.
 - Lancer le site : `uv run --system-certs python -m mediatheque.web.app --db mediatheque.db` (http://127.0.0.1:5000). Utiliser `python -m`, car les lanceurs `.exe` de uv (`mediatheque-web`, `mediatheque`) se bloquent sur ce poste.
-- Base de démonstration avec comptes de test : `uv run python scripts/creer_demo.py demo.db` (identifiants dans la docstring du script).
+- Base de démonstration avec comptes de test : `uv run python scripts/creer_demo.py demo.db`. Elle part de `data_demo/` et crée un compte `prenom.nom` par adhérent, plus `admin` (mots de passe dans la docstring du script). Compter environ 25 s.
+- Régénérer `data_demo/` : `uv run python scripts/generer_donnees.py [--graine 42]`.
 - Le serveur de prévisualisation de Claude est configuré dans `../../.claude/launch.json` (racine du dépôt).
 - Dépendance de dev : `pytest`. Lancer les tests : `uv run --system-certs pytest -q -p no:cacheprovider`. Sur ce réseau, uv a besoin de `--system-certs`, et OneDrive bloque le cache de pytest, d'où `-p no:cacheprovider`.
 - Lancer la démo console : `uv run mediatheque` (elle travaille sur une copie temporaire de `data/`).
@@ -57,7 +58,9 @@ Plan détaillé et priorités : `docs/RAPPORT_SITUATION.md`. **Mettre à jour la
 - [x] P1 : SQLite, comptes et rôles, réservations, `mediatheque-init` (81 tests). Audit de sécurité : voir `docs/securite/` (S1–S7 corrigées).
 - [x] Agent `security-fixer` : S1–S7 corrigées (un commit par faille).
 - [x] P2 : site web Flask d'après les maquettes Claude Design, vérifié dans le navigateur sur ordinateur et sur mobile. 181 tests au total.
-- [ ] P2 bis : audit `security-tester` du site web (pas encore lancé)
+- [x] Jeu de démo `data_demo/` : 136 documents et 45 adhérents, généré par `scripts/generer_donnees.py` (simulation déterministe de 5 mois d'activité). `data/` reste le petit jeu utilisé par les tests.
+- [x] P2 bis : audit du site web, `docs/securite/AUDIT_2026-11-10_web.md`. Il trouve les failles W1–W7 (3 moyennes, 4 basses), **pas encore corrigées** et prouvées par des tests xfail dans `tests/security/test_securite_web*.py`.
+- [ ] Corriger W1–W7 (agent `security-fixer`), puis refonte visuelle pour un rendu moins « IA » (plugin frontend-design proposé).
 - [ ] P3 : README, journalisation, audit final
 
 ## Règles de travail
