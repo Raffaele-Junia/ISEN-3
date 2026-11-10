@@ -8,12 +8,16 @@
 - Delai progressif par identifiant apres plusieurs echecs (1, 2, 4... s,
   plafonne) : la force brute reste lente, sans qu'un tiers puisse bloquer
   longtemps un compte (le responsable notamment).
+- Utilisable depuis plusieurs threads (site web) : un petit verrou interne
+  protege le registre et les compteurs d'echecs, mais le hachage scrypt
+  (lent) se fait toujours EN DEHORS de ce verrou (W1).
 """
 import hashlib
 import hmac
 import math
 import re
 import secrets
+import threading
 import time
 from dataclasses import dataclass, replace
 
@@ -111,9 +115,12 @@ class GestionComptes:
         self._echecs = {}  # identifiant -> (nb_echecs, bloque_jusqu_a, dernier_echec)
         self._horloge = horloge
         self._sel_leurre = secrets.token_bytes(16)
+        # protege _comptes et _echecs ; jamais tenu pendant un hachage (W1)
+        self._verrou = threading.Lock()
 
     def __iter__(self):
-        return iter(self._comptes.values())
+        with self._verrou:
+            return iter(list(self._comptes.values()))
 
     def __len__(self):
         return len(self._comptes)
@@ -122,9 +129,10 @@ class GestionComptes:
         return identifiant in self._comptes
 
     def ajouter(self, compte):
-        if compte.identifiant in self._comptes:
-            raise MediathequeError(f"identifiant deja utilise : {compte.identifiant}")
-        self._comptes[compte.identifiant] = compte
+        with self._verrou:
+            if compte.identifiant in self._comptes:
+                raise MediathequeError(f"identifiant deja utilise : {compte.identifiant}")
+            self._comptes[compte.identifiant] = compte
 
     def creer(self, identifiant, mot_de_passe, role, numero_adherent=None):
         identifiant = identifiant.strip().lower()
@@ -142,45 +150,52 @@ class GestionComptes:
         return self._comptes.get(identifiant)
 
     def supprimer(self, identifiant):
-        self._comptes.pop(identifiant, None)
+        with self._verrou:
+            self._comptes.pop(identifiant, None)
 
     def compte_de_adherent(self, numero):
-        return next((c for c in self._comptes.values()
-                     if c.numero_adherent == numero), None)
+        return next((c for c in self if c.numero_adherent == numero), None)
 
     def authentifier(self, identifiant, mot_de_passe):
         identifiant = identifiant.strip().lower()
-        maintenant = self._horloge()
-        nb, bloque_jusqu_a, dernier = self._echecs.get(identifiant, (0, 0.0, 0.0))
-        if bloque_jusqu_a > maintenant:
-            # refuse meme le bon mot de passe ; la tentative n'est pas comptee
-            raise CompteBloqueError(math.ceil(bloque_jusqu_a - maintenant))
-        if nb and maintenant - dernier > OUBLI_S:
-            nb = 0
+        with self._verrou:
+            maintenant = self._horloge()
+            _, bloque_jusqu_a, _ = self._echecs.get(identifiant, (0, 0.0, 0.0))
+            if bloque_jusqu_a > maintenant:
+                # refuse meme le bon mot de passe ; la tentative n'est pas comptee
+                raise CompteBloqueError(math.ceil(bloque_jusqu_a - maintenant))
+            compte = self._comptes.get(identifiant)
 
-        compte = self._comptes.get(identifiant)
+        # hachage (lent) hors du verrou interne
         sel = compte.sel if compte else self._sel_leurre
         params = parametres_du_hash(compte.hash_mdp) if compte else parametres_scrypt
         a_jour = _memes_parametres(params, parametres_scrypt)
         # calcule meme si le compte est inconnu (pas de fuite par le temps)
         calcule = hacher(mot_de_passe, sel) if a_jour else hacher(mot_de_passe, sel, params)
         if compte is not None and hmac.compare_digest(calcule, compte.hash_mdp):
-            self._echecs.pop(identifiant, None)
+            with self._verrou:
+                self._echecs.pop(identifiant, None)
             if not a_jour:  # hash ancien : re-hache avec les parametres courants
                 compte = self._remplacer_mot_de_passe(compte, mot_de_passe)
             return compte
 
-        nb += 1
-        delai = 0.0
-        if nb >= MAX_ECHECS:
-            delai = min(DELAI_BASE_S * 2 ** (nb - MAX_ECHECS), DELAI_MAX_S)
-        self._echecs[identifiant] = (nb, maintenant + delai, maintenant)
-        if len(self._echecs) > _MAX_SUIVIS:
-            self._purger(maintenant)
+        with self._verrou:
+            # relu sous le verrou : deux echecs simultanes comptent bien pour deux
+            nb, _, dernier = self._echecs.get(identifiant, (0, 0.0, 0.0))
+            if nb and maintenant - dernier > OUBLI_S:
+                nb = 0
+            nb += 1
+            delai = 0.0
+            if nb >= MAX_ECHECS:
+                delai = min(DELAI_BASE_S * 2 ** (nb - MAX_ECHECS), DELAI_MAX_S)
+            self._echecs[identifiant] = (nb, maintenant + delai, maintenant)
+            if len(self._echecs) > _MAX_SUIVIS:
+                self._purger(maintenant)
         raise AuthentificationError()
 
     def _purger(self, maintenant):
-        """Oublie les compteurs sans echec depuis OUBLI_S (memoire bornee)."""
+        """Oublie les compteurs sans echec depuis OUBLI_S (memoire bornee).
+        Appelee sous self._verrou."""
         self._echecs = {i: e for i, e in self._echecs.items()
                         if maintenant - e[2] <= OUBLI_S}
 
@@ -195,11 +210,17 @@ class GestionComptes:
         if compte is None:
             raise MediathequeError(f"compte inconnu : {identifiant}")
         valider_mot_de_passe(nouveau)
-        self._echecs.pop(identifiant, None)
+        with self._verrou:
+            self._echecs.pop(identifiant, None)
         return self._remplacer_mot_de_passe(compte, nouveau)
 
     def _remplacer_mot_de_passe(self, compte, nouveau):
         sel = secrets.token_bytes(16)
-        nouveau_compte = replace(compte, sel=sel, hash_mdp=hacher(nouveau, sel))
-        self._comptes[compte.identifiant] = nouveau_compte
+        nouveau_compte = replace(compte, sel=sel, hash_mdp=hacher(nouveau, sel))  # hors verrou
+        with self._verrou:
+            if self._comptes.get(compte.identifiant) is not compte:
+                # compte remplace entre-temps (reinitialise ailleurs) : on
+                # n'ecrase pas la modification la plus recente
+                raise AuthentificationError()
+            self._comptes[compte.identifiant] = nouveau_compte
         return nouveau_compte

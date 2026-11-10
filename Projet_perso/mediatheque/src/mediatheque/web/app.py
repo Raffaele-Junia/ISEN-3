@@ -7,12 +7,18 @@ Regles de securite de la couche web :
 - tout POST exige un jeton CSRF ;
 - en-tetes de securite (CSP stricte, anti-iframe, nosniff) ;
 - Jinja echappe automatiquement tout le HTML (pas de XSS via un titre).
+- le hachage scrypt (lent, 128 Mo) ne se fait jamais sous le verrou global :
+  au plus HACHAGES_SIMULTANES a la fois, 503 si le site est sature, et une
+  limite de tentatives de connexion par adresse IP (429 au-dela).
 """
 import csv
 import io
 import os
 import secrets
 import threading
+import time
+from collections import deque
+from contextlib import contextmanager
 from datetime import date
 from functools import wraps
 from pathlib import Path
@@ -75,8 +81,49 @@ CSP = ("default-src 'self'; script-src 'none'; style-src 'self' https://fonts.go
        "font-src https://fonts.gstatic.com; img-src 'self' data:; "
        "form-action 'self'; frame-ancestors 'none'; base-uri 'none'")
 
+HACHAGES_SIMULTANES = 2      # scrypt N=2**17 : 128 Mo de memoire par calcul
+ATTENTE_HACHAGE_S = 3        # au-dela, 503 (site sature)
+TENTATIVES_PAR_IP = 10       # tentatives de connexion par adresse...
+FENETRE_IP_S = 60            # ...sur une fenetre glissante d'une minute
 
-def create_app(db, secret_key=None, testing=False):
+
+class LimiteParIP:
+    """Fenetre glissante en memoire : au plus `limite` tentatives par
+    `fenetre` secondes et par adresse. Une connexion reussie ne compte pas."""
+
+    _MAX_ADRESSES = 10_000
+
+    def __init__(self, limite, fenetre):
+        self.limite, self.fenetre = limite, fenetre
+        self._tentatives = {}  # adresse -> deque de dates (time.monotonic)
+        self._verrou = threading.Lock()
+
+    def entrer(self, adresse):
+        """Enregistre une tentative ; renvoie sa date, ou None si la limite est atteinte."""
+        maintenant = time.monotonic()
+        with self._verrou:
+            dates = self._tentatives.setdefault(adresse, deque())
+            while dates and maintenant - dates[0] > self.fenetre:
+                dates.popleft()
+            if len(dates) >= self.limite:
+                return None
+            dates.append(maintenant)
+            if len(self._tentatives) > self._MAX_ADRESSES:  # memoire bornee
+                self._tentatives = {a: d for a, d in self._tentatives.items()
+                                    if d and maintenant - d[-1] <= self.fenetre}
+            return maintenant
+
+    def oublier(self, adresse, date_tentative):
+        """Retire une tentative (connexion reussie, ou jamais traitee)."""
+        with self._verrou:
+            dates = self._tentatives.get(adresse)
+            if dates and date_tentative in dates:
+                dates.remove(date_tentative)
+
+
+def create_app(db, secret_key=None, testing=False, *,
+               attente_hachage_s=ATTENTE_HACHAGE_S,
+               tentatives_par_ip=TENTATIVES_PAR_IP, fenetre_ip_s=FENETRE_IP_S):
     db = Path(db)
     if not db.exists():
         raise FileNotFoundError(
@@ -94,8 +141,20 @@ def create_app(db, secret_key=None, testing=False):
     m = Mediatheque.charger(db)
     verrou = threading.RLock()
     sessions_actives = {}  # jeton -> Session (cote serveur)
+    hachage = threading.BoundedSemaphore(HACHAGES_SIMULTANES)  # jamais sous `verrou` (W1)
+    limite_ip = LimiteParIP(tentatives_par_ip, fenetre_ip_s)
 
     # ------------------------------------------------------------ outillage
+    @contextmanager
+    def emplacement_hachage():
+        """Un des HACHAGES_SIMULTANES emplacements, ou 503 si le site est sature."""
+        if not hachage.acquire(timeout=attente_hachage_s):
+            abort(503)
+        try:
+            yield
+        finally:
+            hachage.release()
+
     def compte_enregistre(compte):
         # session revoquee (compte supprime, role ou mot de passe change par le
         # responsable) : on deconnecte proprement au lieu d'une erreur 500
@@ -193,12 +252,22 @@ def create_app(db, secret_key=None, testing=False):
         identifiant = ""
         if request.method == "POST":
             identifiant = request.form.get("identifiant", "")[:64]
+            adresse = request.remote_addr or "?"
+            tentative = limite_ip.entrer(adresse)
+            if tentative is None:
+                abort(429)
             try:
-                with verrou:
-                    s = ouvrir_session(m, identifiant, request.form.get("mot_de_passe", "")[:256])
+                # scrypt HORS du verrou global (W1), sous le semaphore
+                with emplacement_hachage():
+                    s = ouvrir_session(m, identifiant,
+                                       request.form.get("mot_de_passe", "")[:256])
             except AuthentificationError as e:
                 erreur = str(e)
+            except BaseException:  # 503 (sature) : la tentative n'a pas eu lieu
+                limite_ip.oublier(adresse, tentative)
+                raise
             else:
+                limite_ip.oublier(adresse, tentative)  # une reussite ne compte pas
                 ancien = session.pop("jeton", None)
                 sessions_actives.pop(ancien, None)
                 session.clear()  # nouvelle session : evite la fixation de session
@@ -263,15 +332,23 @@ def create_app(db, secret_key=None, testing=False):
 
     @app.post("/compte/mot-de-passe")
     @connexion_requise
-    @action
     def changer_mot_de_passe():
+        # Pas de @action : les deux scrypt se font HORS du verrou global (W1),
+        # sous le semaphore ; seule la sauvegarde prend le verrou.
         nouveau = request.form.get("nouveau", "")
-        if nouveau != request.form.get("confirmation", ""):
-            raise MediathequeError("les deux mots de passe ne correspondent pas")
         try:
-            g.s.changer_mot_de_passe(request.form.get("ancien", ""), nouveau)
-        except AuthentificationError:
-            raise MediathequeError("mot de passe actuel incorrect") from None
+            if nouveau != request.form.get("confirmation", ""):
+                raise MediathequeError("les deux mots de passe ne correspondent pas")
+            with emplacement_hachage():
+                try:
+                    g.s.changer_mot_de_passe(request.form.get("ancien", ""), nouveau)
+                except AuthentificationError:
+                    raise MediathequeError("mot de passe actuel incorrect") from None
+        except MediathequeError as e:
+            flash(str(e), "erreur")
+            return redirect(url_for("compte"))
+        with verrou:
+            m.sauvegarder()
         # la Session met elle-meme son compte a jour (S4) : rien a reconstruire
         flash("Mot de passe modifié.", "ok")
         return redirect(url_for("compte"))
@@ -398,6 +475,22 @@ def create_app(db, secret_key=None, testing=False):
     @app.errorhandler(404)
     def introuvable(_):
         return render_template("erreur.html", code=404, message="Page introuvable."), 404
+
+    @app.errorhandler(429)
+    def trop_de_tentatives(_):
+        return render_template(
+            "erreur.html", code=429,
+            message="Trop de tentatives de connexion depuis cette adresse. "
+                    "Patientez une minute avant de réessayer."
+        ), 429, {"Retry-After": str(int(fenetre_ip_s))}
+
+    @app.errorhandler(503)
+    def site_sature(_):
+        return render_template(
+            "erreur.html", code=503,
+            message="Beaucoup de lecteurs se connectent en même temps. "
+                    "Réessayez dans quelques secondes."
+        ), 503, {"Retry-After": "5"}
 
     app.extensions["mediatheque"] = m
     return app

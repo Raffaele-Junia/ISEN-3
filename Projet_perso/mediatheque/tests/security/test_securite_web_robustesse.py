@@ -94,8 +94,6 @@ def test_w7_cout_identique_compte_ancien_ou_inconnu(app_compte_ancien, monkeypat
 
 
 # ===================================================== deni de service
-@pytest.mark.xfail(strict=True, reason="faille W1 : scrypt (~0,45 s) est calcule sous le "
-                   "verrou global : une rafale de connexions bloque toutes les actions du site")
 def test_w1_hachage_hors_du_verrou_global(web_app, monkeypatch):
     verrou = variable_interne(web_app, "verrou")
     tenu_pendant_le_hachage = []
@@ -108,6 +106,59 @@ def test_w1_hachage_hors_du_verrou_global(web_app, monkeypatch):
 
     connecter(web_app.test_client(), "personne", "Mauvais999")  # sans compte, avec un CSRF libre
     assert tenu_pendant_le_hachage and not any(tenu_pendant_le_hachage)
+
+
+def test_w1_changement_de_mot_de_passe_hache_hors_du_verrou(web_app, web_lea, monkeypatch):
+    verrou = variable_interne(web_app, "verrou")
+    tenu_pendant_le_hachage = []
+    vrai_hacher = auth.hacher
+
+    def espion(*args, **kwargs):
+        tenu_pendant_le_hachage.append(verrou_tenu(verrou))
+        return vrai_hacher(*args, **kwargs)
+    monkeypatch.setattr(auth, "hacher", espion)
+
+    poster(web_lea, "/compte/mot-de-passe", page="/compte",
+           ancien=MDP, nouveau="Nouveau456", confirmation="Nouveau456")
+    assert len(tenu_pendant_le_hachage) == 2 and not any(tenu_pendant_le_hachage)
+    assert "Mot de passe modifié" in web_lea.get("/compte").get_data(as_text=True)
+
+
+def test_w1_site_sature_donne_503(web_db):
+    app = create_app(web_db, secret_key="test", testing=True, attente_hachage_s=0.01)
+    emplacement = variable_interne(app, "emplacement_hachage").__wrapped__
+    hachage = emplacement.__closure__[emplacement.__code__.co_freevars.index("hachage")].cell_contents
+    pris = [hachage.acquire(blocking=False) for _ in range(2)]  # deux connexions en cours
+    try:
+        assert all(pris)
+        r = connecter(app.test_client(), "lea")
+        assert r.status_code == 503 and "Retry-After" in r.headers
+        assert "Réessayez dans quelques secondes" in r.get_data(as_text=True)
+    finally:
+        for _ in pris:
+            hachage.release()
+    assert connecter(app.test_client(), "lea").status_code == 302
+
+
+def test_w1_limite_de_tentatives_par_adresse_ip(web_db):
+    app = create_app(web_db, secret_key="test", testing=True, tentatives_par_ip=3)
+    c = app.test_client()
+    for _ in range(3):
+        assert connecter(c, "personne", "Mauvais999").status_code == 200
+    r = connecter(c, "lea")
+    assert r.status_code == 429 and "Trop de tentatives" in r.get_data(as_text=True)
+    autre = {"REMOTE_ADDR": "10.0.0.2"}  # une autre adresse n'est pas bloquee
+    page = c.get("/connexion", environ_base=autre).get_data(as_text=True)
+    jeton = re.search(r'name="csrf" value="([^"]+)"', page).group(1)
+    r = c.post("/connexion", environ_base=autre,
+               data={"identifiant": "lea", "mot_de_passe": MDP, "csrf": jeton})
+    assert r.status_code == 302
+
+
+def test_w1_connexions_reussies_non_comptees(web_db):
+    app = create_app(web_db, secret_key="test", testing=True, tentatives_par_ip=2)
+    for _ in range(4):  # une borne partagee : plusieurs lecteurs, une seule adresse
+        assert connecter(app.test_client(), "lea").status_code == 302
 
 
 
