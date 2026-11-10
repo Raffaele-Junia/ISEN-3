@@ -1,4 +1,7 @@
+import shutil
+import tempfile
 from datetime import date
+from pathlib import Path
 
 from .documents import Livre
 from .exceptions import MediathequeError
@@ -11,8 +14,16 @@ TENTATIVES = [("D003", "A002"), ("D001", "A002"), ("D002", "A001"),
               ("D005", "A001"), ("D999", "A003"), ("D004", "A009")]
 
 
-def main():
-    with Mediatheque.charger("data") as m:
+def main(dossier_source="data"):
+    # La demo travaille sur une copie temporaire pour ne jamais modifier data/.
+    with tempfile.TemporaryDirectory() as tmp:
+        dossier = Path(tmp) / "data"
+        shutil.copytree(dossier_source, dossier)
+        _demo(dossier)
+
+
+def _demo(dossier):
+    with Mediatheque.charger(dossier) as m:
         dispo = sum(1 for d in m if m.disponible(d.id))
         print(f"Mediatheque : {dispo} documents disponibles sur {len(m)}")
 
@@ -44,10 +55,12 @@ def main():
         print("\nTop emprunteurs : "
               + ", ".join(f"{numero} ({nb})" for numero, nb in top))
 
-        nb = export_retards_csv("retards.csv", liste_retards)
-        print(f"Rapport ecrit dans retards.csv ({nb} ligne{'s' if nb > 1 else ''})")
+        chemin_retards = dossier / "retards.csv"
+        nb = export_retards_csv(chemin_retards, liste_retards)
+        print(f"Rapport ecrit dans {chemin_retards.name} "
+              f"({nb} ligne{'s' if nb > 1 else ''})")
 
-    print("Sauvegarde dans data/ terminee")
+    print("Demo terminee (copie temporaire, data/ inchange)")
 
 
 if __name__ == "__main__":
