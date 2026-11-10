@@ -10,7 +10,7 @@ from datetime import date
 
 from .adherents import Adherent
 from .auth import Compte
-from .documents import Document
+from .documents import CHAMPS_FICHE, Document
 from .emprunt import Emprunt
 from .reservation import Reservation
 
@@ -20,7 +20,14 @@ CREATE TABLE IF NOT EXISTS documents (
     type    TEXT NOT NULL,
     titre   TEXT NOT NULL,
     annee   INTEGER NOT NULL,
-    extra   TEXT NOT NULL
+    extra   TEXT NOT NULL,
+    genre   TEXT NOT NULL DEFAULT '',
+    themes  TEXT NOT NULL DEFAULT '',
+    resume  TEXT NOT NULL DEFAULT '',
+    editeur TEXT NOT NULL DEFAULT '',
+    pages   INTEGER NOT NULL DEFAULT 0,
+    isbn    TEXT NOT NULL DEFAULT '',
+    public  TEXT NOT NULL DEFAULT ''
 );
 CREATE TABLE IF NOT EXISTS adherents (
     numero  TEXT PRIMARY KEY,
@@ -54,11 +61,28 @@ CREATE TABLE IF NOT EXISTS comptes (
 """
 
 
+# Colonnes ajoutees apres la premiere version : migrees automatiquement.
+# Les noms viennent de cette constante (jamais d'une saisie) : pas d'injection.
+_COLONNES_FICHE = {"genre": "TEXT NOT NULL DEFAULT ''", "themes": "TEXT NOT NULL DEFAULT ''",
+                   "resume": "TEXT NOT NULL DEFAULT ''", "editeur": "TEXT NOT NULL DEFAULT ''",
+                   "pages": "INTEGER NOT NULL DEFAULT 0", "isbn": "TEXT NOT NULL DEFAULT ''",
+                   "public": "TEXT NOT NULL DEFAULT ''"}
+
+
 def connecter(chemin):
     con = sqlite3.connect(chemin)
     con.execute("PRAGMA foreign_keys = ON")
     con.executescript(SCHEMA)
+    _migrer(con)
     return con
+
+
+def _migrer(con):
+    existantes = {ligne[1] for ligne in con.execute("PRAGMA table_info(documents)")}
+    for nom, definition in _COLONNES_FICHE.items():
+        if nom not in existantes:
+            con.execute(f"ALTER TABLE documents ADD COLUMN {nom} {definition}")
+    con.commit()
 
 
 def charger(chemin):
@@ -66,7 +90,8 @@ def charger(chemin):
     with closing(connecter(chemin)) as con:
         con.row_factory = sqlite3.Row
         documents = [Document.from_csv_row(dict(r)) for r in
-                     con.execute("SELECT id, type, titre, annee, extra FROM documents")]
+                     con.execute("SELECT id, type, titre, annee, extra, " + ", ".join(CHAMPS_FICHE)
+                                 + " FROM documents")]
         adherents = [Adherent.from_csv_row(dict(r)) for r in
                      con.execute("SELECT numero, nom, prenom, type FROM adherents")]
         emprunts = [Emprunt.from_csv_row({**dict(r), "date_retour": r["date_retour"] or ""})
@@ -95,8 +120,10 @@ def sauvegarder(chemin, documents, adherents, emprunts, reservations=(), comptes
             con.execute("DELETE FROM documents")
             con.execute("DELETE FROM adherents")
             con.executemany(
-                "INSERT INTO documents (id, type, titre, annee, extra) VALUES (?, ?, ?, ?, ?)",
-                [(d.id, d.CLE, d.titre, d.annee, str(d._extra)) for d in documents])
+                "INSERT INTO documents (id, type, titre, annee, extra, " + ", ".join(CHAMPS_FICHE)
+                + ") VALUES (?, ?, ?, ?, ?" + ", ?" * len(CHAMPS_FICHE) + ")",
+                [(d.id, d.CLE, d.titre, d.annee, str(d._extra),
+                  *(d.fiche[c] for c in CHAMPS_FICHE)) for d in documents])
             con.executemany(
                 "INSERT INTO adherents (numero, nom, prenom, type) VALUES (?, ?, ?, ?)",
                 [(a.numero, a.nom, a.prenom, a.type) for a in adherents])

@@ -1,5 +1,5 @@
 import csv
-from .documents import Document
+from .documents import CHAMPS_FICHE, Document
 from .adherents import Adherent
 from .emprunt import Emprunt
 from .reservation import Reservation
@@ -24,7 +24,7 @@ def lire_emprunts(chemin):
 
 def ecrire_documents(chemin,documents):
     with open(chemin, "w", encoding="utf-8", newline="") as f:
-        writer = csv.DictWriter(f,fieldnames=["id","type","titre","annee","extra"])
+        writer = csv.DictWriter(f,fieldnames=["id","type","titre","annee","extra",*CHAMPS_FICHE])
         writer.writeheader()
         for document in documents:
             writer.writerow(document.to_csv_row())
