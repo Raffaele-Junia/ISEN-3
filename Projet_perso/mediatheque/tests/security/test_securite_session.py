@@ -110,8 +110,6 @@ def test_s1_responsable_peut_passer_une_date(admin):
 
 
 # ------------------------------------ S2 : objets metier mutables exposes
-@pytest.mark.xfail(strict=True, reason="faille S2 : session.compte est le Compte partage "
-                   "et modifiable : role passe a responsable (et persiste)")
 def test_s2_adherent_ne_peut_pas_s_auto_promouvoir(mc, lea):
     try:
         lea.compte.role = RESPONSABLE
@@ -123,8 +121,6 @@ def test_s2_adherent_ne_peut_pas_s_auto_promouvoir(mc, lea):
     assert stocke.role == ADHERENT
 
 
-@pytest.mark.xfail(strict=True, reason="faille S2 : session.compte.numero_adherent "
-                   "modifiable : l'adherent agit au nom d'un autre")
 def test_s2_adherent_ne_peut_pas_changer_de_numero(mc, lea):
     try:
         lea.compte.numero_adherent = "A002"
@@ -134,8 +130,6 @@ def test_s2_adherent_ne_peut_pas_changer_de_numero(mc, lea):
         lea.mon_compte("A002")
 
 
-@pytest.mark.xfail(strict=True, reason="faille S2 : mon_compte() renvoie l'Adherent vivant : "
-                   "l'adherent passe premium (quota 6) par simple affectation")
 def test_s2_mon_compte_ne_permet_pas_de_changer_son_type(mc, lea):
     try:
         lea.mon_compte()["adherent"].type = "premium"
@@ -144,8 +138,6 @@ def test_s2_mon_compte_ne_permet_pas_de_changer_son_type(mc, lea):
     assert mc.adherent("A001").type == "standard"
 
 
-@pytest.mark.xfail(strict=True, reason="faille S2 : catalogue() renvoie les Document vivants : "
-                   "un adherent peut modifier un titre")
 def test_s2_catalogue_ne_permet_pas_de_modifier_un_document(mc, lea):
     document, _ = next(iter(lea.catalogue("Fluent")))
     try:
@@ -153,6 +145,25 @@ def test_s2_catalogue_ne_permet_pas_de_modifier_un_document(mc, lea):
     except (AttributeError, TypeError):
         pass
     assert mc["D001"].titre == "Fluent Python"
+
+
+def test_s2_compte_de_session_non_reaffectable(lea, mc):
+    with pytest.raises(AttributeError):
+        lea.compte = next(c for c in mc.comptes if c.identifiant == "admin")
+    assert not lea.est_responsable
+
+
+def test_s2_documents_de_mon_compte_sont_des_copies(mc, admin, lea):
+    admin.enregistrer_emprunt("D001", "A001", date.today())
+    lea.mon_compte()["emprunts"][0]["document"].titre = "pirate"
+    assert mc["D001"].titre == "Fluent Python"
+
+
+def test_s2_changement_de_mot_de_passe_remplace_le_compte(mc, lea):
+    ancien = lea.compte
+    lea.changer_mot_de_passe(MDP, "Nouveau456")
+    assert lea.compte is not ancien and lea.compte.role == ADHERENT
+    assert ouvrir_session(mc, "lea", "Nouveau456").compte.numero_adherent == "A001"
 
 
 # ------------------------- S4 : Session falsifiable et non revocable

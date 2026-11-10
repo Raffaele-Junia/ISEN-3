@@ -4,7 +4,11 @@ Chaque operation verifie le role du compte connecte ici, dans la couche
 metier. Masquer un bouton dans l'interface ne suffit jamais.
 - adherent    : consulte le catalogue et SON compte, reserve / annule pour LUI.
 - responsable : tout, y compris agir pour un adherent donne.
+
+Les objets renvoyes (documents, adherent) sont des COPIES : les modifier n'a
+aucun effet sur l'etat metier. Le compte de la session est immuable.
 """
+from copy import copy
 from datetime import date
 from functools import wraps
 
@@ -42,8 +46,13 @@ class Session:
 
     def __init__(self, mediatheque, compte):
         self._m = mediatheque
-        self.compte = compte
+        self._compte = compte
         self._ouverte = True
+
+    @property
+    def compte(self):
+        """Compte connecte (immuable, non reaffectable)."""
+        return self._compte
 
     # ------------------------------------------------------------- utilitaires
     @property
@@ -92,7 +101,7 @@ class Session:
                 statut = "emprunte"
             else:
                 statut = "reserve"
-            resultat.append((d, statut))
+            resultat.append((copy(d), statut))
         return resultat
 
     @connexion_requise
@@ -109,7 +118,7 @@ class Session:
         for e in self._m.emprunts_de(numero):
             duree = self._m[e.id_document].duree_pret_jour
             emprunts.append({
-                "document": self._m[e.id_document],
+                "document": copy(self._m[e.id_document]),
                 "date_emprunt": e.date_emprunt,
                 "date_limite": e.date_limite(duree),
                 "jours_retard": e.jours_retard(duree, aujourdhui),
@@ -118,13 +127,13 @@ class Session:
         for r in self._m.reservations_de(numero):
             file = self._m.file_attente(r.id_document)
             reservations.append({
-                "document": self._m[r.id_document],
+                "document": copy(self._m[r.id_document]),
                 "statut": r.statut,
                 "rang": file.index(r) + 1,
                 "date_limite_retrait": r.date_limite_retrait,
             })
         return {
-            "adherent": adherent,
+            "adherent": copy(adherent),
             "emprunts": emprunts,
             "quota_restant": adherent.quota - len(emprunts),
             "reservations": reservations,
@@ -142,7 +151,8 @@ class Session:
 
     @connexion_requise
     def changer_mot_de_passe(self, ancien, nouveau):
-        self._m.comptes.changer_mot_de_passe(self.compte.identifiant, ancien, nouveau)
+        self._compte = self._m.comptes.changer_mot_de_passe(
+            self.compte.identifiant, ancien, nouveau)
 
     # ------------------------------------------------------------ responsable
     @responsable_requis

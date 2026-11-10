@@ -12,7 +12,7 @@ import hmac
 import re
 import secrets
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 from .exceptions import AuthentificationError, CompteBloqueError, MediathequeError
 
@@ -37,8 +37,9 @@ def valider_mot_de_passe(mot_de_passe):
             "mot de passe trop faible : 8 caracteres minimum, avec lettres et chiffres")
 
 
-@dataclass
+@dataclass(frozen=True)
 class Compte:
+    """Immuable : un changement de mot de passe remplace le compte dans le registre."""
     identifiant: str
     hash_mdp: bytes
     sel: bytes
@@ -119,8 +120,7 @@ class GestionComptes:
     def changer_mot_de_passe(self, identifiant, ancien, nouveau):
         compte = self.authentifier(identifiant, ancien)
         valider_mot_de_passe(nouveau)
-        compte.sel = secrets.token_bytes(16)
-        compte.hash_mdp = hacher(nouveau, compte.sel)
+        return self._remplacer_mot_de_passe(compte, nouveau)
 
     def reinitialiser_mot_de_passe(self, identifiant, nouveau):
         """Reserve au responsable (controle dans Session)."""
@@ -128,6 +128,11 @@ class GestionComptes:
         if compte is None:
             raise MediathequeError(f"compte inconnu : {identifiant}")
         valider_mot_de_passe(nouveau)
-        compte.sel = secrets.token_bytes(16)
-        compte.hash_mdp = hacher(nouveau, compte.sel)
         self._echecs.pop(identifiant, None)
+        return self._remplacer_mot_de_passe(compte, nouveau)
+
+    def _remplacer_mot_de_passe(self, compte, nouveau):
+        sel = secrets.token_bytes(16)
+        nouveau_compte = replace(compte, sel=sel, hash_mdp=hacher(nouveau, sel))
+        self._comptes[compte.identifiant] = nouveau_compte
+        return nouveau_compte
