@@ -186,9 +186,16 @@ class Session:
         return self._m.adherents
 
     @responsable_requis
-    def ajouter_adherent(self, numero, nom, prenom, type_adherent):
-        adherent = Adherent(numero, nom, prenom, type_adherent)
+    def ajouter_adherent(self, numero, nom, prenom, type_adherent,
+                         identifiant=None, mot_de_passe=None):
+        """Avec `identifiant`, cree aussi son compte adherent. Tout est valide
+        AVANT la premiere modification (W4) : pas d'adherent cree sans compte."""
+        adherent = Adherent(numero, nom, prenom, type_adherent)  # valide
+        if identifiant:
+            self._m.comptes.verifier_nouveau(identifiant, mot_de_passe or "")
         self._m.ajouter_adherent(adherent)
+        if identifiant:
+            self._m.creer_compte(identifiant, mot_de_passe, ADHERENT, numero)
         return adherent
 
     @responsable_requis

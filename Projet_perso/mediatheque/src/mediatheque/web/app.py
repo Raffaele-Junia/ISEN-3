@@ -27,7 +27,6 @@ from flask import (Flask, Response, abort, flash, g, get_flashed_messages, redir
                    render_template, request, session, url_for)
 from markupsafe import Markup
 
-from ..auth import ADHERENT
 from ..exceptions import AuthentificationError, MediathequeError
 from ..mediatheque import Mediatheque
 from ..session import ouvrir_session
@@ -223,7 +222,9 @@ def create_app(db, secret_key=None, testing=False, *,
         return enveloppe
 
     def action(vue):
-        """POST qui modifie l'etat : verrou, sauvegarde, erreurs metier en message."""
+        """POST qui modifie l'etat : verrou, sauvegarde, erreurs metier en message.
+        Atomique (W4) : si la vue ou la sauvegarde echoue, la memoire est
+        rechargee depuis la base, en place."""
         @wraps(vue)
         def enveloppe(*args, **kwargs):
             with verrou:
@@ -231,7 +232,10 @@ def create_app(db, secret_key=None, testing=False, *,
                     reponse = vue(*args, **kwargs)
                     m.sauvegarder()
                     return reponse
-                except (MediathequeError, ValueError) as e:
+                except BaseException as e:
+                    m.recharger()  # memoire = base, quoi qu'il arrive
+                    if not isinstance(e, (MediathequeError, ValueError)):
+                        raise
                     flash(str(e), "erreur")
                     return redirect(request.referrer or url_for("accueil"))
         return enveloppe
@@ -385,7 +389,11 @@ def create_app(db, secret_key=None, testing=False, *,
             flash(str(e), "erreur")
             return redirect(url_for("compte"))
         with verrou:
-            m.sauvegarder()
+            try:
+                m.sauvegarder()
+            except BaseException:
+                m.recharger()  # W4 : la memoire ne garde pas un changement non enregistre
+                raise
         # la Session met elle-meme son compte a jour (S4) : rien a reconstruire
         flash("Mot de passe modifié.", "ok")
         return redirect(url_for("compte"))
@@ -483,10 +491,11 @@ def create_app(db, secret_key=None, testing=False, *,
     @action
     def admin_ajouter_adherent():
         f = request.form
+        # identifiant et mot de passe valides AVANT la creation de l'adherent (W4)
         a = g.s.ajouter_adherent(f["numero"].strip(), f["nom"].strip(),
-                                 f["prenom"].strip(), f["type"])
-        if f.get("identifiant", "").strip():
-            g.s.creer_compte(f["identifiant"], f["mot_de_passe"], ADHERENT, a.numero)
+                                 f["prenom"].strip(), f["type"],
+                                 f.get("identifiant", "").strip() or None,
+                                 f.get("mot_de_passe", ""))
         flash(f"Adhérent {a.numero} ({a.nom_complet}) créé.", "ok")
         return redirect(url_for("gestion", onglet="adherents"))
 

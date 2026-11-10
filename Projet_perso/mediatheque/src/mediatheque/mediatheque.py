@@ -130,6 +130,19 @@ class Mediatheque:
         if any(n > 1 for n in mises.values()):
             raise MediathequeError("document mis de cote pour deux adherents")
 
+    def recharger(self):
+        """Remet l'etat en memoire au contenu de la source, EN PLACE (W4) : les
+        objets qui gardent une reference a cette mediatheque (sessions ouvertes)
+        voient l'etat recharge. Les comptes inchanges gardent leur identite
+        (les sessions restent valides) et les compteurs d'echecs sont conserves."""
+        if self._source is None:
+            raise ValueError("aucune source a recharger")
+        neuf = type(self).charger(self._source)
+        self._documents, self._adherents = neuf._documents, neuf._adherents
+        self._emprunts, self._reservations = neuf._emprunts, neuf._reservations
+        if self._est_sqlite(self._source):  # les CSV ne contiennent pas les comptes
+            self.comptes.synchroniser(neuf.comptes)
+
     def sauvegarder(self, destination=None):
         destination = Path(destination) if destination is not None else self._source
         if destination is None:

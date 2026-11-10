@@ -176,9 +176,6 @@ def test_longueurs_tronquees_a_la_connexion(web_app, monkeypatch):
 
 
 # ========================================================= atomicite
-@pytest.mark.xfail(strict=True, reason="faille W4 : le decorateur `action` ne defait pas les "
-                   "modifications en memoire quand l'action echoue : adherent cree sans compte, "
-                   "puis persiste par l'action suivante alors que le responsable a vu une erreur")
 def test_w4_echec_partiel_annule(web_app, web_admin, web_ines):
     m = web_app.extensions["mediatheque"]
     poster(web_admin, "/admin/adherents", page="/admin/gestion?onglet=adherents",
@@ -189,6 +186,32 @@ def test_w4_echec_partiel_annule(web_app, web_admin, web_ines):
     poster(web_ines, "/reserver/D001")  # action ordinaire d'un autre utilisateur
     assert "A004" not in [a.numero for a in Mediatheque.charger(m._source).adherents]
     assert "A004" not in [a.numero for a in m.adherents]
+
+
+def test_w4_identifiant_deja_pris_valide_avant_creation(web_app, web_admin, monkeypatch):
+    m = web_app.extensions["mediatheque"]
+    monkeypatch.setattr(m, "ajouter_adherent",
+                        lambda a: pytest.fail("adherent cree avant la validation du compte"))
+    poster(web_admin, "/admin/adherents", page="/admin/gestion?onglet=adherents",
+           numero="A004", prenom="Noe", nom="Blanc", type="standard",
+           identifiant="lea", mot_de_passe="Provisoire1")
+    assert "A004" not in [a.numero for a in m.adherents]
+
+
+def test_w4_echec_de_sauvegarde_recharge_en_place(web_app, web_admin, web_lea, monkeypatch):
+    """La base refuse l'ecriture : erreur, mais la memoire reste egale a la base,
+    sur le MEME objet (les sessions ouvertes le voient) et sans les deconnecter."""
+    m = web_app.extensions["mediatheque"]
+
+    def panne(*a, **k):
+        raise OSError("disque plein")
+    monkeypatch.setattr(m, "sauvegarder", panne)
+    with pytest.raises(OSError):  # testing=True : l'exception remonte au lieu d'une 500
+        poster(web_admin, "/admin/emprunt", page="/admin", id_document="D005", numero="A003")
+    assert web_app.extensions["mediatheque"] is m
+    assert m.disponible("D005")
+    assert web_lea.get("/compte").status_code == 200
+    assert web_admin.get("/admin").status_code == 200
 
 
 

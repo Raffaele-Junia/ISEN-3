@@ -134,12 +134,21 @@ class GestionComptes:
                 raise MediathequeError(f"identifiant deja utilise : {compte.identifiant}")
             self._comptes[compte.identifiant] = compte
 
-    def creer(self, identifiant, mot_de_passe, role, numero_adherent=None):
+    def verifier_nouveau(self, identifiant, mot_de_passe):
+        """Controles d'un futur compte SANS rien modifier : format de
+        l'identifiant, unicite, politique de mot de passe. Renvoie
+        l'identifiant normalise."""
         identifiant = identifiant.strip().lower()
         if not _FORMAT_IDENTIFIANT.fullmatch(identifiant):
             raise MediathequeError(
                 "identifiant invalide : 3 a 32 caracteres parmi a-z 0-9 . _ -")
+        if identifiant in self._comptes:
+            raise MediathequeError(f"identifiant deja utilise : {identifiant}")
         valider_mot_de_passe(mot_de_passe)
+        return identifiant
+
+    def creer(self, identifiant, mot_de_passe, role, numero_adherent=None):
+        identifiant = self.verifier_nouveau(identifiant, mot_de_passe)
         sel = secrets.token_bytes(16)
         compte = Compte(identifiant, hacher(mot_de_passe, sel), sel, role, numero_adherent)
         self.ajouter(compte)
@@ -148,6 +157,17 @@ class GestionComptes:
     def get(self, identifiant):
         """Compte actuellement enregistre pour cet identifiant (ou None)."""
         return self._comptes.get(identifiant)
+
+    def synchroniser(self, autre):
+        """Aligne le registre sur `autre` (comptes relus en base). Un compte
+        identique garde son objet actuel : les sessions ouvertes dessus restent
+        valides ; un compte different ou disparu les revoque (S4)."""
+        with self._verrou:
+            actuels = self._comptes
+            self._comptes = {
+                c.identifiant: (actuels[c.identifiant]
+                                if actuels.get(c.identifiant) == c else c)
+                for c in autre}
 
     def supprimer(self, identifiant):
         with self._verrou:
