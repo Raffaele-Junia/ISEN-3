@@ -1,6 +1,7 @@
 from datetime import date
 from pathlib import Path
 
+from . import stockage_sqlite
 from .emprunt import Emprunt
 from .exceptions import (AdherentInconnuError, DocumentIndisponibleError,
                          DocumentInconnuError, QuotaDepasseError, MediathequeError)
@@ -14,38 +15,62 @@ class Mediatheque:
         self._documents = {}
         self._adherents = {}
         self._emprunts = []
-        self._dossier = None
+        self._source = None
 
     def ajouter_document(self, document):
+        if document.id in self._documents:
+            raise MediathequeError(f"identifiant de document deja utilise : {document.id}")
         self._documents[document.id] = document
 
     def ajouter_adherent(self, adherent):
+        if adherent.numero in self._adherents:
+            raise MediathequeError(f"numero d'adherent deja utilise : {adherent.numero}")
         self._adherents[adherent.numero] = adherent
 
     def ajouter_emprunt(self, emprunt):
+        if emprunt.id_document not in self._documents:
+            raise DocumentInconnuError(emprunt.id_document)
+        if emprunt.numero_adherent not in self._adherents:
+            raise AdherentInconnuError(emprunt.numero_adherent)
         self._emprunts.append(emprunt)
 
+    @staticmethod
+    def _est_sqlite(source):
+        return Path(source).suffix in (".db", ".sqlite", ".sqlite3")
+
     @classmethod
-    def charger(cls, dossier):
-        dossier = Path(dossier)
+    def charger(cls, source):
+        """Charge depuis une base SQLite (`*.db`) ou un dossier de CSV."""
+        source = Path(source)
+        if cls._est_sqlite(source):
+            documents, adherents, emprunts = stockage_sqlite.charger(source)
+        else:
+            documents = lire_documents(source / "documents.csv")
+            adherents = lire_adherents(source / "adherents.csv")
+            emprunts = lire_emprunts(source / "emprunts.csv")
         m = cls()
-        m._dossier = dossier
-        for document in lire_documents(dossier / "documents.csv"):
+        m._source = source
+        for document in documents:
             m.ajouter_document(document)
-        for adherent in lire_adherents(dossier / "adherents.csv"):
+        for adherent in adherents:
             m.ajouter_adherent(adherent)
-        for emprunt in lire_emprunts(dossier / "emprunts.csv"):
+        for emprunt in emprunts:
             m.ajouter_emprunt(emprunt)
         return m
 
-    def sauvegarder(self, dossier=None):
-        dossier = Path(dossier) if dossier is not None else self._dossier
-        if dossier is None:
-            raise ValueError("aucun dossier de sauvegarde indique")
-        dossier.mkdir(parents=True, exist_ok=True)
-        ecrire_documents(dossier / "documents.csv", self._documents.values())
-        ecrire_adherents(dossier / "adherents.csv", self._adherents.values())
-        ecrire_emprunts(dossier / "emprunts.csv", self._emprunts)
+    def sauvegarder(self, destination=None):
+        destination = Path(destination) if destination is not None else self._source
+        if destination is None:
+            raise ValueError("aucune destination de sauvegarde indiquee")
+        if self._est_sqlite(destination):
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            stockage_sqlite.sauvegarder(destination, self._documents.values(),
+                                        self._adherents.values(), self._emprunts)
+            return
+        destination.mkdir(parents=True, exist_ok=True)
+        ecrire_documents(destination / "documents.csv", self._documents.values())
+        ecrire_adherents(destination / "adherents.csv", self._adherents.values())
+        ecrire_emprunts(destination / "emprunts.csv", self._emprunts)
 
     @property
     def emprunts(self):
