@@ -76,8 +76,6 @@ def app_compte_ancien(dossier_data, tmp_path):
     return create_app(chemin, secret_key="test", testing=True)
 
 
-@pytest.mark.xfail(strict=True, reason="faille W7 : un compte a hash ancien (N=2**14) "
-                   "repond ~8x plus vite qu'un identifiant inconnu (N=2**17) : enumeration par le temps")
 def test_w7_cout_identique_compte_ancien_ou_inconnu(app_compte_ancien, monkeypatch):
     couts = []
     vrai_hacher = auth.hacher
@@ -91,6 +89,32 @@ def test_w7_cout_identique_compte_ancien_ou_inconnu(app_compte_ancien, monkeypat
     cout_inconnu, couts[:] = max(couts), []
     connecter(app_compte_ancien.test_client(), "hugo", "Mauvais999")
     assert max(couts) == cout_inconnu
+
+
+def test_w7_meme_ensemble_de_hachages_pour_tous_les_cas(app_compte_ancien, monkeypatch):
+    """Compte a jour, compte ancien ou inconnu : exactement les memes calculs."""
+    couts = []
+    vrai_hacher = auth.hacher
+
+    def espion(mot_de_passe, sel, params=None):
+        couts.append((params or auth.parametres_scrypt)["n"])
+        return vrai_hacher(mot_de_passe, sel, params)
+    monkeypatch.setattr(auth, "hacher", espion)
+
+    releves = {}
+    for ident in ("personne", "hugo", "lea"):
+        couts.clear()
+        connecter(app_compte_ancien.test_client(), ident, "Mauvais999")
+        releves[ident] = sorted(couts)
+    assert releves["personne"] == releves["hugo"] == releves["lea"]
+
+
+def test_w7_pas_de_leurre_quand_tous_les_hash_sont_a_jour(web_app, monkeypatch):
+    appels = []
+    vrai_hacher = auth.hacher
+    monkeypatch.setattr(auth, "hacher", lambda *a: appels.append(a) or vrai_hacher(*a))
+    connecter(web_app.test_client(), "personne", "Mauvais999")
+    assert len(appels) == 1
 
 
 # ===================================================== deni de service

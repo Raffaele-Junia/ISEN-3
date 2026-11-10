@@ -185,6 +185,7 @@ class GestionComptes:
                 # refuse meme le bon mot de passe ; la tentative n'est pas comptee
                 raise CompteBloqueError(math.ceil(bloque_jusqu_a - maintenant))
             compte = self._comptes.get(identifiant)
+            historiques = self._a_des_hash_anciens()
 
         # hachage (lent) hors du verrou interne
         sel = compte.sel if compte else self._sel_leurre
@@ -192,6 +193,13 @@ class GestionComptes:
         a_jour = _memes_parametres(params, parametres_scrypt)
         # calcule meme si le compte est inconnu (pas de fuite par le temps)
         calcule = hacher(mot_de_passe, sel) if a_jour else hacher(mot_de_passe, sel, params)
+        # Cout constant (W7) : tant qu'il reste des hashes anciens, CHAQUE
+        # tentative coute un hash courant + un hash historique, que le compte
+        # soit a jour, ancien ou inconnu (le second est un leurre).
+        if not a_jour:
+            hacher(mot_de_passe, self._sel_leurre)
+        elif historiques:
+            hacher(mot_de_passe, self._sel_leurre, _SCRYPT_HISTORIQUE)
         if compte is not None and hmac.compare_digest(calcule, compte.hash_mdp):
             with self._verrou:
                 self._echecs.pop(identifiant, None)
@@ -212,6 +220,13 @@ class GestionComptes:
             if len(self._echecs) > _MAX_SUIVIS:
                 self._purger(maintenant)
         raise AuthentificationError()
+
+    def _a_des_hash_anciens(self):
+        """Vrai s'il reste un compte au hash non courant (format d'avant S6).
+        Information globale, identique pour tous les identifiants : elle ne
+        renseigne pas sur l'existence d'un compte. Appelee sous self._verrou."""
+        return any(not _memes_parametres(parametres_du_hash(c.hash_mdp), parametres_scrypt)
+                   for c in self._comptes.values())
 
     def _purger(self, maintenant):
         """Oublie les compteurs sans echec depuis OUBLI_S (memoire bornee).
