@@ -3,7 +3,7 @@
 Deux signaux combines :
 1. le CONTENU : meme genre, themes partages, meme auteur, meme revue, epoque proche ;
 2. les USAGES : « les lecteurs qui ont emprunte ceci ont aussi emprunte cela »
-   (co-emprunts agreges : aucune donnee individuelle n'est exposee).
+   (co-emprunts agreges : seuil d'anonymat de 3 autres lecteurs).
 
 Les recommandations personnelles (`pour_adherent`) partent de l'historique du
 lecteur et indiquent la raison (« Parce que vous avez aime 1984 »).
@@ -20,18 +20,23 @@ POIDS_EPOQUE = 0.5
 POIDS_CO_EMPRUNT = 1.2   # par lecteur commun, plafonne
 PLAFOND_CO_EMPRUNT = 3
 SEUIL = 2.5              # en dessous, la ressemblance n'est pas montree
+SEUIL_ANONYMAT = 3       # une paire de co-emprunts ne compte qu'a partir de 3 lecteurs (F1)
 
 
-def co_emprunts(m):
-    """Compteur {(id_a, id_b): nb de lecteurs ayant emprunte les deux}, a < b."""
+def co_emprunts(m, exclure=None):
+    """Compteur {(id_a, id_b): nb de lecteurs ayant emprunte les deux}, a < b.
+
+    Anonymat (F1) : le lecteur `exclure` (celui qui demande) n'est pas compte, et
+    une paire n'est gardee que si au moins SEUIL_ANONYMAT AUTRES lecteurs l'ont."""
     par_lecteur = defaultdict(set)
     for e in m.emprunts:
-        par_lecteur[e.numero_adherent].add(e.id_document)
+        if e.numero_adherent != exclure:
+            par_lecteur[e.numero_adherent].add(e.id_document)
     compteur = Counter()
     for ids in par_lecteur.values():
         for a, b in combinations(sorted(ids), 2):
             compteur[a, b] += 1
-    return compteur
+    return Counter({k: v for k, v in compteur.items() if v >= SEUIL_ANONYMAT})
 
 
 def ressemblance(a, b, co=None):
@@ -54,10 +59,10 @@ def ressemblance(a, b, co=None):
     return score
 
 
-def similaires(m, id_document, n=6, exclure=(), co=None):
-    """Les n documents qui ressemblent le plus a `id_document`."""
+def similaires(m, id_document, n=6, exclure=(), co=None, numero=None):
+    """Les n documents qui ressemblent le plus a `id_document` (pour le lecteur `numero`)."""
     reference = m[id_document]
-    co = co_emprunts(m) if co is None else co
+    co = co_emprunts(m, exclure=numero) if co is None else co
     exclure = set(exclure) | {id_document}
     notes = [(ressemblance(reference, d, co), d) for d in m if d.id not in exclure]
     notes = [(s, d) for s, d in notes if s >= SEUIL]
@@ -97,7 +102,7 @@ def pour_adherent(m, numero, n=8, aujourdhui=None):
     if not historique:
         return repli()
 
-    co = co_emprunts(m)
+    co = co_emprunts(m, exclure=numero)
     scores, raisons = defaultdict(float), {}
     for id_vu, poids in historique.items():
         vu = m[id_vu]

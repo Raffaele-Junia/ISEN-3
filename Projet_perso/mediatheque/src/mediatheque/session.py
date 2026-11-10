@@ -164,7 +164,8 @@ class Session:
             raise DocumentInconnuError(id_document)
         exclure = {x.id for x, _ in self.fiche(id_document)["meme_createur"]}
         return [(copy(x), self._statut(x.id))
-                for x in recommandations.similaires(self._m, id_document, n, exclure)]
+                for x in recommandations.similaires(self._m, id_document, n, exclure,
+                                                          numero=self.compte.numero_adherent)]
 
     @connexion_requise
     def pour_moi(self, numero=None, n=8):

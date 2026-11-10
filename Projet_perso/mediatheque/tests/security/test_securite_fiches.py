@@ -66,8 +66,6 @@ def _suggestions_espion(victime_a_lu_d005):
     return [(x["document"].id, x["raison"]) for x in s.pour_moi()]
 
 
-@pytest.mark.xfail(strict=True, reason="faille F1 : « Pour vous » revele l'historique "
-                   "d'UN autre lecteur (co-emprunts sans seuil d'anonymat)")
 def test_f1_pour_moi_ne_depend_pas_d_un_seul_autre_lecteur():
     """La seule difference entre les deux mondes est un emprunt de la victime.
     L'espion voit apparaitre D005 « Parce que vous avez lu Titre 1 », alors que
@@ -79,8 +77,6 @@ def test_f1_pour_moi_ne_depend_pas_d_un_seul_autre_lecteur():
     assert avec == sans, avec   # observe : [('D005', 'Parce que vous avez lu « Titre 1 »')]
 
 
-@pytest.mark.xfail(strict=True, reason="faille F1 : « Dans la meme veine » revele un "
-                   "co-emprunt individuel (deux lecteurs suffisent, dont l'espion)")
 def test_f1_similaires_ne_depend_pas_d_un_seul_autre_lecteur():
     def voisins(victime):
         m = Mediatheque()
@@ -449,8 +445,6 @@ def test_resume_trop_long_refuse_sans_ajout(web_app, web_admin):
     assert "D052" not in web_app.extensions["mediatheque"]
 
 
-@pytest.mark.xfail(strict=True, reason="faille F5 : un theme contenant le separateur « | » "
-                   "n'est pas refuse : la fiche change apres sauvegarde et rechargement")
 def test_f5_themes_identiques_apres_rechargement(web_app, web_admin):
     poster(web_admin, "/admin/documents", page="/admin/gestion", type="livre", id="D053",
            titre="T", annee="2000", extra="A", themes="science|fiction, polar")
