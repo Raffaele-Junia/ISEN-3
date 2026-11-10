@@ -57,6 +57,12 @@ class Session:
         if not self._ouverte:
             raise AccesRefuseError("session fermee : reconnectez-vous")
 
+    def _jour(self, jour):
+        """Seul le responsable peut antidater ou postdater une operation (S1)."""
+        if jour is not None and not self.est_responsable:
+            raise AccesRefuseError("la date est fixee par le systeme")
+        return jour or date.today()
+
     def _numero_cible(self, numero):
         """Un adherent n'agit que pour lui-meme ; le responsable pour qui il veut."""
         if self.compte.role == ADHERENT:
@@ -96,7 +102,7 @@ class Session:
     @connexion_requise
     def mon_compte(self, numero=None, aujourdhui=None):
         numero = self._numero_cible(numero)
-        aujourdhui = aujourdhui or date.today()
+        aujourdhui = self._jour(aujourdhui)
         self._m.actualiser_reservations(aujourdhui)
         adherent = self._m.adherent(numero)
         emprunts = []
@@ -126,11 +132,13 @@ class Session:
 
     @connexion_requise
     def reserver(self, id_document, numero=None, jour=None):
-        return self._m.reserver(id_document, self._numero_cible(numero), jour)
+        return self._m.reserver(id_document, self._numero_cible(numero),
+                                self._jour(jour))
 
     @connexion_requise
     def annuler_reservation(self, id_document, numero=None, jour=None):
-        return self._m.annuler_reservation(id_document, self._numero_cible(numero), jour)
+        return self._m.annuler_reservation(id_document, self._numero_cible(numero),
+                                           self._jour(jour))
 
     @connexion_requise
     def changer_mot_de_passe(self, ancien, nouveau):

@@ -67,15 +67,13 @@ def _mise_de_cote_pour_lea(admin, lea, hugo):
     aujourdhui = date.today()
     admin.enregistrer_emprunt("D001", "A003", aujourdhui - timedelta(days=1))
     admin.enregistrer_emprunt("D002", "A003", aujourdhui - timedelta(days=1))
-    resa_lea = lea.reserver("D001", jour=aujourdhui)
-    hugo.reserver("D001", jour=aujourdhui)
+    resa_lea = lea.reserver("D001")  # un adherent ne choisit pas la date (S1)
+    hugo.reserver("D001")
     admin.enregistrer_retour("D001", aujourdhui)
     assert resa_lea.statut == DISPONIBLE
     return resa_lea
 
 
-@pytest.mark.xfail(strict=True, reason="faille S1 : un adherent impose la date "
-                   "(mon_compte(aujourdhui=...)) et fait expirer la mise de cote d'un autre")
 def test_s1_adherent_ne_fait_pas_expirer_la_reservation_d_un_autre(admin, lea, hugo):
     resa_lea = _mise_de_cote_pour_lea(admin, lea, hugo)
     try:
@@ -85,8 +83,6 @@ def test_s1_adherent_ne_fait_pas_expirer_la_reservation_d_un_autre(admin, lea, h
     assert resa_lea.statut == DISPONIBLE
 
 
-@pytest.mark.xfail(strict=True, reason="faille S1 : reserver(jour=...) dans le futur "
-                   "declenche l'expiration des mises de cote des autres adherents")
 def test_s1_reserver_avec_date_future_sans_effet_sur_les_autres(admin, lea, hugo):
     resa_lea = _mise_de_cote_pour_lea(admin, lea, hugo)
     try:
@@ -94,6 +90,23 @@ def test_s1_reserver_avec_date_future_sans_effet_sur_les_autres(admin, lea, hugo
     except (AccesRefuseError, MediathequeError):
         pass
     assert resa_lea.statut == DISPONIBLE
+
+
+@pytest.mark.parametrize("appel", [
+    lambda s: s.mon_compte(aujourdhui=date.today()),
+    lambda s: s.reserver("D001", jour=date.today()),
+    lambda s: s.annuler_reservation("D001", jour=date.today()),
+])
+def test_s1_adherent_ne_peut_pas_passer_de_date(lea, appel):
+    with pytest.raises(AccesRefuseError):
+        appel(lea)
+
+
+def test_s1_responsable_peut_passer_une_date(admin):
+    admin.enregistrer_emprunt("D001", "A003", date.today())
+    resa = admin.reserver("D001", numero="A001", jour=date.today() - timedelta(days=1))
+    assert resa.date_reservation == date.today() - timedelta(days=1)
+    assert admin.mon_compte("A001", aujourdhui=date.today())["reservations"]
 
 
 # ------------------------------------ S2 : objets metier mutables exposes

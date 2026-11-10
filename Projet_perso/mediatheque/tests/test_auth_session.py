@@ -141,8 +141,8 @@ def test_adherent_ne_peut_pas_agir_pour_un_autre(lea, admin):
         lea.reserver("D001", numero="A002")
     with pytest.raises(AccesRefuseError):
         lea.mon_compte(numero="A002")
-    lea.reserver("D001", jour=AUJOURDHUI)
-    assert lea.mon_compte(aujourdhui=AUJOURDHUI)["reservations"][0]["rang"] == 1
+    lea.reserver("D001")
+    assert lea.mon_compte()["reservations"][0]["rang"] == 1
 
 
 def test_session_fermee(lea):
@@ -159,14 +159,14 @@ def test_parcours_complet(mc, admin, lea):
     assert [d.id for d, _ in lea.catalogue("python")] == ["D001"]
     assert [d.id for d, _ in lea.catalogue(type_doc="dvd")] == ["D002"]
 
-    lea.reserver("D001", jour=AUJOURDHUI)
+    lea.reserver("D001")
     admin.enregistrer_retour("D001", AUJOURDHUI)
     assert dict((d.id, s) for d, s in lea.catalogue())["D001"] == "disponible"
     hugo = ouvrir_session(mc, "hugo", MDP)
     assert dict((d.id, s) for d, s in hugo.catalogue())["D001"] == "reserve"
 
     admin.enregistrer_emprunt("D001", "A001", AUJOURDHUI)
-    compte = lea.mon_compte(aujourdhui=AUJOURDHUI)
+    compte = lea.mon_compte()
     assert [e["document"].id for e in compte["emprunts"]] == ["D001"]
     assert compte["quota_restant"] == 2 and compte["reservations"] == []
 
