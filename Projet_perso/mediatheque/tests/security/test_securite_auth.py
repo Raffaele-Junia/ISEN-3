@@ -1,10 +1,11 @@
 """Audit securite P1 : authentification, enumeration, blocage."""
+import hashlib
 import inspect
 
 import pytest
 
 from mediatheque import auth
-from mediatheque.auth import ADHERENT, MAX_ECHECS, RESPONSABLE, GestionComptes
+from mediatheque.auth import ADHERENT, MAX_ECHECS, RESPONSABLE, Compte, GestionComptes
 from mediatheque.exceptions import AuthentificationError, CompteBloqueError
 from mediatheque.session import ouvrir_session
 
@@ -165,8 +166,34 @@ def test_s5_compteurs_purges(comptes, horloge, monkeypatch):
 
 
 # --------------------------------------------- S6 : cout scrypt insuffisant
-@pytest.mark.xfail(strict=True, reason="faille S6 : scrypt N=2**14, sous le minimum "
-                   "OWASP (N=2**17, r=8, p=1)")
 def test_s6_cout_scrypt_conforme_owasp():
     assert auth._SCRYPT["n"] >= 2**17
     assert auth._SCRYPT["r"] >= 8
+
+
+def test_s6_parametres_de_production_utilisables():
+    """maxmem suffisant : hashlib.scrypt ne leve pas avec N=2**17 (vrai cout)."""
+    empreinte = auth.hacher(MDP, b"s" * 16, auth._SCRYPT)
+    assert empreinte.startswith(b"$s1$") and len(empreinte) == 39
+    assert auth.parametres_du_hash(empreinte)["n"] == 2**17
+
+
+def test_s6_ancien_hash_accepte_puis_rehache(comptes):
+    """Compatibilite : un hash d'avant S6 (32 octets bruts, N=2**14) fonctionne
+    toujours et il est re-hache avec les parametres courants a la connexion."""
+    sel = b"x" * 16
+    ancien = hashlib.scrypt(MDP.encode(), salt=sel, n=2**14, r=8, p=1, dklen=32)
+    comptes.ajouter(Compte("ancien", ancien, sel, RESPONSABLE))
+    compte = comptes.authentifier("ancien", MDP)
+    assert compte.hash_mdp != ancien
+    assert auth.parametres_du_hash(compte.hash_mdp)["n"] == auth.parametres_scrypt["n"]
+    assert comptes.authentifier("ancien", MDP) is compte
+    with pytest.raises(AuthentificationError):
+        comptes.authentifier("ancien", "Mauvais123")
+
+
+def test_s6_parametres_falsifies_refuses():
+    """Une base falsifiee ne peut pas imposer un N demesure (deni de service)."""
+    faux = b"$s1$" + bytes((40, 8, 1)) + b"x" * 32
+    with pytest.raises(ValueError):
+        Compte("x", faux, b"s" * 16, RESPONSABLE)

@@ -29,12 +29,52 @@ DELAI_MAX_S = 60          # plafond du delai
 DUREE_BLOCAGE_S = DELAI_MAX_S  # attente maximale (nom historique)
 OUBLI_S = 3600            # compteur oublie apres 1 h sans echec
 _MAX_SUIVIS = 10_000      # au-dela, purge des compteurs perimes
-_SCRYPT = {"n": 2**14, "r": 8, "p": 1, "dklen": 32}
 _FORMAT_IDENTIFIANT = re.compile(r"[a-z0-9._-]{3,32}")
 
+# --- Hachage scrypt ----------------------------------------------------------
+# Production : minimum OWASP (N=2**17, r=8, p=1), soit 128 Mo de memoire.
+_MAXMEM = 256 * 2**20
+_SCRYPT = {"n": 2**17, "r": 8, "p": 1, "dklen": 32, "maxmem": _MAXMEM}
+# Parametres utilises pour les NOUVEAUX hashes. Seuls les tests les abaissent
+# (tests/conftest.py) ; ne jamais les modifier en production.
+parametres_scrypt = _SCRYPT
+# Hashes d'avant S6 : 32 octets bruts, N=2**14 (toujours acceptes, puis
+# re-haches avec les parametres courants a la connexion suivante).
+_SCRYPT_HISTORIQUE = {"n": 2**14, "r": 8, "p": 1, "dklen": 32, "maxmem": _MAXMEM}
+# Format actuel : b"$s1$" + log2(n), r, p (1 octet chacun) + empreinte de 32 octets.
+_PREFIXE = b"$s1$"
+_DKLEN = 32
 
-def hacher(mot_de_passe, sel):
-    return hashlib.scrypt(mot_de_passe.encode("utf-8"), salt=sel, **_SCRYPT)
+
+def _encoder(params, empreinte):
+    if params["n"] == _SCRYPT_HISTORIQUE["n"] and params["r"] == 8 and params["p"] == 1:
+        return empreinte  # format historique (brut)
+    return _PREFIXE + bytes((params["n"].bit_length() - 1, params["r"], params["p"])) + empreinte
+
+
+def parametres_du_hash(hash_mdp):
+    """Parametres scrypt d'un hash stocke. Leve ValueError s'ils sont invalides
+    ou demesures (base falsifiee : deni de service par la memoire)."""
+    if not (hash_mdp.startswith(_PREFIXE) and len(hash_mdp) == len(_PREFIXE) + 3 + _DKLEN):
+        return _SCRYPT_HISTORIQUE
+    log_n, r, p = hash_mdp[len(_PREFIXE):len(_PREFIXE) + 3]
+    if not (1 <= log_n <= 20 and 1 <= r <= 32 and 1 <= p <= 16
+            and 128 * r * (2**log_n + p) <= _MAXMEM - 2**20):
+        raise ValueError("parametres de hachage invalides")
+    return {"n": 2**log_n, "r": r, "p": p, "dklen": _DKLEN, "maxmem": _MAXMEM}
+
+
+def _memes_parametres(a, b):
+    return all(a[k] == b[k] for k in ("n", "r", "p", "dklen"))
+
+
+def hacher(mot_de_passe, sel, params=None):
+    """Hash encode (parametres inclus) ; `params` par defaut : parametres_scrypt."""
+    params = parametres_scrypt if params is None else params
+    empreinte = hashlib.scrypt(mot_de_passe.encode("utf-8"), salt=sel, n=params["n"],
+                               r=params["r"], p=params["p"], dklen=params["dklen"],
+                               maxmem=params.get("maxmem", _MAXMEM))
+    return _encoder(params, empreinte)
 
 
 def valider_mot_de_passe(mot_de_passe):
@@ -58,6 +98,7 @@ class Compte:
             raise ValueError(f"role invalide : {self.role}")
         if self.role == ADHERENT and not self.numero_adherent:
             raise ValueError("un compte adherent doit etre lie a un numero d'adherent")
+        parametres_du_hash(self.hash_mdp)  # ValueError si parametres falsifies
 
     def __repr__(self):  # ne jamais afficher le hash ni le sel
         return f"Compte({self.identifiant!r}, role={self.role!r})"
@@ -119,9 +160,14 @@ class GestionComptes:
 
         compte = self._comptes.get(identifiant)
         sel = compte.sel if compte else self._sel_leurre
-        calcule = hacher(mot_de_passe, sel)  # calcule meme si compte inconnu
+        params = parametres_du_hash(compte.hash_mdp) if compte else parametres_scrypt
+        a_jour = _memes_parametres(params, parametres_scrypt)
+        # calcule meme si le compte est inconnu (pas de fuite par le temps)
+        calcule = hacher(mot_de_passe, sel) if a_jour else hacher(mot_de_passe, sel, params)
         if compte is not None and hmac.compare_digest(calcule, compte.hash_mdp):
             self._echecs.pop(identifiant, None)
+            if not a_jour:  # hash ancien : re-hache avec les parametres courants
+                compte = self._remplacer_mot_de_passe(compte, mot_de_passe)
             return compte
 
         nb += 1
