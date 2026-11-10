@@ -29,10 +29,45 @@ from ..session import ouvrir_session
 TYPES = [("livre", "Livre"), ("dvd", "DVD"), ("revue", "Revue")]
 LIBELLE_EXTRA = {"livre": "Auteur", "dvd": "Durée (min)", "revue": "Numéro"}
 
+NOM_MEDIATHEQUE = os.environ.get("MEDIATHEQUE_NOM", "Médiathèque des Tilleuls")
+
+# Trois livres sur une etagere : le logo est dessine, pas une icone de bibliotheque d'icones
 ICONE_LOGO = Markup(
-    '<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" '
-    'stroke-width="1.8" aria-hidden="true"><path d="M4 19V5a2 2 0 0 1 2-2h5v18H6a2 2 0 0 '
-    '1-2-2z"/><path d="M11 3h7a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-7"/></svg>')
+    '<svg class="logo-svg" width="34" height="30" viewBox="0 0 34 30" aria-hidden="true">'
+    '<rect x="2" y="6" width="7" height="20" rx="1" fill="currentColor"/>'
+    '<rect x="11" y="3" width="6" height="23" rx="1" fill="var(--accent-vif)"/>'
+    '<rect x="19.5" y="8" width="6" height="18" rx="1" fill="currentColor" '
+    'transform="rotate(-12 22.5 26)"/>'
+    '<rect x="0" y="27" width="34" height="2.2" rx="1" fill="currentColor"/></svg>')
+
+MOIS_COURTS = ["janv.", "févr.", "mars", "avr.", "mai", "juin", "juil.", "août",
+               "sept.", "oct.", "nov.", "déc."]
+JOURS = ["lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi", "dimanche"]
+TEINTES = 8  # nombre de couleurs de couverture definies dans style.css
+
+
+def cote(doc):
+    """Cote facon etiquette de dos : LIV HUG, DVD INC, PER SCI."""
+    prefixe = {"livre": "LIV", "dvd": "DVD", "revue": "PER"}.get(doc.CLE, "DOC")
+    source = doc.detail if doc.CLE == "livre" else doc.titre
+    mots = [w for w in source.replace("'", " ").replace(".", " ").split()
+            if len(w) > 2 and w.lower() not in ("les", "des", "une", "the")]
+    lettres = (mots[-1] if doc.CLE == "livre" and mots else (mots[0] if mots else source))
+    lettres = "".join(c for c in lettres.upper() if c.isalpha())[:3]
+    return f"{prefixe} {lettres}"
+
+
+def teinte(doc):
+    """Couleur de couverture stable pour un document (0..TEINTES-1)."""
+    return sum(map(ord, doc.id + doc.titre)) % TEINTES
+
+
+def date_courte(d):
+    return f"{d.day} {MOIS_COURTS[d.month - 1]}" if d else ""
+
+
+def date_longue(d):
+    return f"{JOURS[d.weekday()]} {d.day} {MOIS_COURTS[d.month - 1].rstrip('.')} {d.year}"
 
 # Aucun script autorise ; seuls les attributs style="" en ligne (largeur des jauges)
 CSP = ("default-src 'self'; script-src 'none'; style-src 'self' https://fonts.googleapis.com; "
@@ -134,11 +169,15 @@ def create_app(db, secret_key=None, testing=False):
             return Markup('<input type="hidden" name="csrf" value="{}">').format(csrf)
 
         return {"csrf": csrf, "jeton": jeton, "icone_logo": ICONE_LOGO, "s": s,
+                "nom_mediatheque": NOM_MEDIATHEQUE, "cote": cote, "teinte": teinte,
                 "aujourdhui": date.today(), "TYPES": TYPES, "LIBELLE_EXTRA": LIBELLE_EXTRA}
 
     @app.template_filter("fr")
     def date_fr(d):
         return d.strftime("%d/%m/%Y") if d else ""
+
+    app.add_template_filter(date_courte, "court")
+    app.add_template_filter(date_longue, "long")
 
     # --------------------------------------------------------- connexion
     @app.get("/")

@@ -1,54 +1,64 @@
 {% extends "base.html" %}
-{% block titre %}Catalogue{% endblock %}
+{% block titre %}Les rayonnages{% endblock %}
 {% block contenu %}
 <div class="titre-page">
   <div>
-    <h1>Catalogue</h1>
-    <p class="muted">{{ total }} document{{ 's' if total > 1 }} · {{ dispo }} disponible{{ 's' if dispo > 1 }} maintenant</p>
+    <span class="surtitre">{{ total }} documents · {{ dispo }} en rayon aujourd'hui</span>
+    <h1>Les rayonnages</h1>
+    <p class="chapo">Un titre est déjà parti&nbsp;? Réservez-le&nbsp;: on vous le garde trois jours à son retour.</p>
   </div>
-  <p class="muted small">Un document emprunté peut être réservé : il vous sera mis de côté 3 jours à son retour.</p>
 </div>
 
 <form class="filtres" method="get" action="{{ url_for('catalogue') }}" role="search">
   <div class="recherche">
-    <label for="q" class="sr">Rechercher</label>
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#565B67" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
-    <input id="q" name="q" type="search" placeholder="Titre, auteur, identifiant…" value="{{ texte }}" maxlength="100">
+    <label for="q" class="sr">Rechercher dans le catalogue</label>
+    <input id="q" name="q" type="search" placeholder="Un titre, un auteur, une cote…" value="{{ texte }}" maxlength="100">
     {% if type_doc %}<input type="hidden" name="type" value="{{ type_doc }}">{% endif %}
-    <button class="btn second" type="submit">Rechercher</button>
+    <button class="btn" type="submit">Chercher</button>
   </div>
-  <nav class="pilules" aria-label="Type de document">
-    <a class="pilule" href="{{ url_for('catalogue', q=texte or None) }}" {% if not type_doc %}aria-current="true"{% endif %}>Tous</a>
-    {% for cle, libelle in TYPES %}
-      <a class="pilule" href="{{ url_for('catalogue', q=texte or None, type=cle) }}" {% if type_doc == cle %}aria-current="true"{% endif %}>{{ libelle }}{{ 's' if cle != 'dvd' }}</a>
-    {% endfor %}
+  <nav class="intercalaires" aria-label="Type de document">
+    <a href="{{ url_for('catalogue', q=texte or None) }}" {% if not type_doc %}aria-current="true"{% endif %}>Tout</a>
+    <a href="{{ url_for('catalogue', q=texte or None, type='livre') }}" {% if type_doc == 'livre' %}aria-current="true"{% endif %}>Livres</a>
+    <a href="{{ url_for('catalogue', q=texte or None, type='dvd') }}" {% if type_doc == 'dvd' %}aria-current="true"{% endif %}>Films</a>
+    <a href="{{ url_for('catalogue', q=texte or None, type='revue') }}" {% if type_doc == 'revue' %}aria-current="true"{% endif %}>Presse</a>
   </nav>
 </form>
 
+{% if texte or type_doc %}<p class="compte-resultats">{{ lignes|length }} résultat{{ 's' if lignes|length > 1 }}{% if texte %} pour « {{ texte }} »{% endif %}</p>{% endif %}
+
 {% if lignes %}
-<div class="grille-docs">
+<div class="etagere">
   {% for l in lignes %}{% set d = l.doc %}
-  <article class="carte doc">
-    <div class="doc-haut">
-      <span class="surtitre">{{ d.TYPE }} · {{ d.id }}</span>
-      <span class="badge {{ l.statut }}">{{ {'disponible': 'disponible', 'emprunte': 'emprunté', 'reserve': 'réservé'}[l.statut] }}</span>
+  <article class="livre" aria-labelledby="titre-{{ d.id }}">
+    <div class="couverture {{ d.CLE }} t{{ teinte(d) }}">
+      {% if d.CLE == 'revue' %}
+        <span class="c-type">Presse · {{ d.annee }}</span>
+        <span class="c-titre" id="titre-{{ d.id }}">{{ d.titre }}</span>
+        <span class="c-num">n°&#8239;{{ d.numero }}</span>
+      {% else %}
+        <span class="c-type">{{ 'Film' if d.CLE == 'dvd' else 'Livre' }} · {{ d.annee }}</span>
+        <div>
+          <span class="c-titre" id="titre-{{ d.id }}">{{ d.titre }}</span>
+          <div class="c-filet"></div>
+          <span class="c-auteur">{{ d.detail }}</span>
+        </div>
+      {% endif %}
+      <span class="etiquette">{{ cote(d) }}</span>
+      {% if l.statut != 'disponible' %}<span class="tampon {{ l.statut }}">{{ {'emprunte': 'Sorti', 'reserve': 'Réservé'}[l.statut] }}</span>{% endif %}
     </div>
-    <div class="doc-corps">
-      <h2>{{ d.titre }}</h2>
-      <p>{{ d.detail }} · {{ d.annee }}</p>
-    </div>
-    <div class="doc-bas">
-      <span class="muted small">
-        {% if l.statut == 'disponible' %}En rayon
-        {% elif l.attente == 0 %}Personne en attente
-        {% else %}{{ l.attente }} personne{{ 's' if l.attente > 1 }} en attente{% endif %}
+    <div class="livre-pied">
+      <span class="info">
+        {% if l.statut == 'disponible' %}En rayon, venez le chercher
+        {% elif l.attente == 0 %}Personne ne l'attend encore
+        {% elif l.attente == 1 %}Une personne l'attend
+        {% else %}{{ l.attente }} personnes l'attendent{% endif %}
       </span>
       {% if not s.est_responsable and l.statut != 'disponible' %}
         {% if l.a_moi %}
           <span class="btn petit fait">{{ l.a_moi }}</span>
         {% else %}
           <form method="post" action="{{ url_for('reserver', id_document=d.id) }}">{{ jeton() }}
-            <button class="btn petit" type="submit" aria-label="Réserver {{ d.titre }}">Réserver</button>
+            <button class="btn second petit" type="submit" aria-label="Réserver {{ d.titre }}">Réserver</button>
           </form>
         {% endif %}
       {% endif %}
@@ -57,6 +67,6 @@
   {% endfor %}
 </div>
 {% else %}
-<div class="carte"><p class="vide">Aucun document ne correspond à votre recherche. <a href="{{ url_for('catalogue') }}">Tout afficher</a></p></div>
+<div class="carte"><p class="vide">Rien sur nos étagères pour cette recherche. Essayez un autre mot, ou <a href="{{ url_for('catalogue') }}">parcourez tout le fonds</a>.</p></div>
 {% endif %}
 {% endblock %}

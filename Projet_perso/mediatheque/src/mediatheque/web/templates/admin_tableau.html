@@ -1,80 +1,82 @@
 {% extends "base.html" %}
-{% block titre %}Tableau de bord{% endblock %}
+{% block titre %}Banque de prêt{% endblock %}
 {% block contenu %}
 <div class="titre-page">
   <div>
-    <h1>Tableau de bord</h1>
-    <p class="muted">{{ aujourdhui|fr }}</p>
+    <span class="surtitre">Tableau de bord · {{ aujourdhui|long }}</span>
+    <h1>Banque de prêt</h1>
   </div>
 </div>
 
-<div class="stats">
-  <div class="carte stat"><span class="label">Documents</span><span class="valeur">{{ stats.documents }}</span><span class="muted small">{{ stats.en_rayon }} en rayon</span></div>
-  <div class="carte stat"><span class="label">Emprunts en cours</span><span class="valeur">{{ stats.emprunts }}</span><span class="muted small">{{ stats.emprunteurs }} adhérent{{ 's' if stats.emprunteurs > 1 }}</span></div>
-  <div class="carte stat"><span class="label">Retards</span><span class="valeur {{ 'alerte' if retards }}">{{ retards|length }}</span><span class="muted small">{{ 'à relancer' if retards else 'aucun' }}</span></div>
-  <div class="carte stat"><span class="label">Réservations actives</span><span class="valeur">{{ stats.reservations }}</span><span class="muted small">{{ stats.mises_de_cote }} mise{{ 's' if stats.mises_de_cote > 1 }} de côté</span></div>
+<div class="journee">
+  <div><span class="label">Fonds</span><span class="valeur">{{ stats.documents }}</span><span class="muted small">dont {{ stats.en_rayon }} en rayon</span></div>
+  <div><span class="label">Sortis</span><span class="valeur">{{ stats.emprunts }}</span><span class="muted small">chez {{ stats.emprunteurs }} lecteur{{ 's' if stats.emprunteurs > 1 }}</span></div>
+  <div><span class="label">En retard</span><span class="valeur {{ 'alerte' if retards }}">{{ retards|length }}</span><span class="muted small">{{ 'à relancer' if retards else 'personne, bravo' }}</span></div>
+  <div><span class="label">Réservations</span><span class="valeur">{{ stats.reservations }}</span><span class="muted small">{{ stats.mises_de_cote }} sur l'étagère des réservés</span></div>
 </div>
 
 <div class="rangee">
-  <section class="carte pad col-etroite" aria-labelledby="h-gui">
-    <h2 id="h-gui">Guichet</h2>
-    <nav class="segments" aria-label="Opération">
-      <a href="{{ url_for('tableau_de_bord', onglet='emprunt') }}" {% if onglet != 'retour' %}aria-current="true"{% endif %}>Emprunt</a>
-      <a href="{{ url_for('tableau_de_bord', onglet='retour') }}" {% if onglet == 'retour' %}aria-current="true"{% endif %}>Retour</a>
+  <section class="col-etroite" aria-labelledby="h-gui">
+    <h2 id="h-gui" class="sr">Guichet</h2>
+    <nav class="onglets" aria-label="Opération au guichet">
+      <a href="{{ url_for('tableau_de_bord', onglet='emprunt') }}" {% if onglet != 'retour' %}aria-current="true"{% endif %}>Un prêt</a>
+      <a href="{{ url_for('tableau_de_bord', onglet='retour') }}" {% if onglet == 'retour' %}aria-current="true"{% endif %}>Un retour</a>
     </nav>
+    <div class="carte pad guichet">
     {% if onglet == 'retour' %}
-      <form method="post" action="{{ url_for('admin_retour') }}" style="display: flex; flex-direction: column; gap: 14px">
+      <form method="post" action="{{ url_for('admin_retour') }}" class="pile">
         {{ jeton() }}
-        <div class="champ"><label for="doc-r">Document rendu</label>
+        <div class="champ"><label for="doc-r">Document rapporté</label>
           <select id="doc-r" name="id_document" required>
-            {% for d in documents %}<option value="{{ d.id }}">{{ d.id }} — {{ d.titre }}</option>{% endfor %}
+            {% for d in documents %}<option value="{{ d.id }}">{{ cote(d) }} — {{ d.titre }}</option>{% endfor %}
           </select></div>
         <button class="btn plein" type="submit">Enregistrer le retour</button>
+        <p class="muted small">S'il est réservé, il part directement sur l'étagère des réservés.</p>
       </form>
     {% else %}
-      <form method="post" action="{{ url_for('admin_emprunt') }}" style="display: flex; flex-direction: column; gap: 14px">
+      <form method="post" action="{{ url_for('admin_emprunt') }}" class="pile">
         {{ jeton() }}
+        <div class="champ"><label for="adh-e">Lecteur</label>
+          <select id="adh-e" name="numero" required>
+            {% for a in adherents %}<option value="{{ a.numero }}">{{ a.nom|upper }} {{ a.prenom }} · {{ a.numero }}</option>{% endfor %}
+          </select></div>
         <div class="champ"><label for="doc-e">Document</label>
           <select id="doc-e" name="id_document" required>
-            {% for d in documents %}<option value="{{ d.id }}">{{ d.id }} — {{ d.titre }}</option>{% endfor %}
+            {% for d in documents %}<option value="{{ d.id }}">{{ cote(d) }} — {{ d.titre }}</option>{% endfor %}
           </select></div>
-        <div class="champ"><label for="adh-e">Adhérent</label>
-          <select id="adh-e" name="numero" required>
-            {% for a in adherents %}<option value="{{ a.numero }}">{{ a.numero }} — {{ a.nom_complet }}</option>{% endfor %}
-          </select></div>
-        <button class="btn plein" type="submit">Enregistrer l'emprunt</button>
+        <button class="btn plein" type="submit">Enregistrer le prêt</button>
       </form>
     {% endif %}
+    </div>
   </section>
 
   <section class="carte col-large" aria-labelledby="h-ret">
     <div class="carte-titre">
       <h2 id="h-ret">Retards</h2>
-      <a class="btn second petit" href="{{ url_for('admin_retards_csv') }}">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg>Exporter CSV</a>
+      <a class="btn second petit" href="{{ url_for('admin_retards_csv') }}">Exporter en CSV</a>
     </div>
     {% if retards %}
     <div class="defile">
       <table>
-        <thead><tr><th>Document</th><th>Adhérent</th><th>Date limite</th><th>Retard</th></tr></thead>
+        <thead><tr><th>Document</th><th>Lecteur</th><th>Attendu le</th><th><span class="sr">Retard</span></th></tr></thead>
         <tbody>
-        {% for r in retards %}
+        {% for r in retards|sort(attribute='jours', reverse=true) %}
           <tr>
-            <td><strong>{{ r.doc.titre }}</strong><span class="sous">{{ r.doc.id }}</span></td>
-            <td>{{ r.nom }}<span class="sous">{{ r.emprunt.numero_adherent }}</span></td>
-            <td>{{ r.emprunt.date_limite(r.doc.duree_pret_jour)|fr }}</td>
-            <td><span class="badge retard">{{ r.jours }} jour{{ 's' if r.jours > 1 }}</span></td>
+            <td><strong>{{ r.doc.titre }}</strong><span class="sous mono">{{ cote(r.doc) }} · {{ r.doc.id }}</span></td>
+            <td>{{ r.nom }}<span class="sous mono">{{ r.emprunt.numero_adherent }}</span></td>
+            <td class="mono">{{ r.emprunt.date_limite(r.doc.duree_pret_jour)|court }}</td>
+            <td><span class="tampon retard">{{ r.jours }} j</span></td>
           </tr>
         {% endfor %}
         </tbody>
       </table>
     </div>
-    {% else %}<p class="vide">Aucun retard.</p>{% endif %}
+    {% else %}<p class="vide">Aucun retard. Tout le monde a rapporté ses livres.</p>{% endif %}
     {% if top %}
     <div class="barres">
-      <h3 class="muted small">Top emprunteurs</h3>
+      <h3>Les plus gros lecteurs</h3>
       {% for nom, nb in top %}
-        <div class="barre"><span class="nom">{{ nom }}</span><span class="piste"><span style="width: {{ (100 * nb / top_max)|round|int }}%"></span></span><span>{{ nb }}</span></div>
+        <div class="barre"><span>{{ nom }}</span><span class="piste"><span style="width: {{ (100 * nb / top_max)|round|int }}%"></span></span><span class="nb">{{ nb }}</span></div>
       {% endfor %}
     </div>
     {% endif %}

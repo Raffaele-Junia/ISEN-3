@@ -3,30 +3,31 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>{% block titre %}Médiathèque{% endblock %} · Médiathèque</title>
+<title>{% block titre %}Accueil{% endblock %} · {{ nom_mediatheque }}</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;700&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght,SOFT,WONK@0,9..144,400..700,0..100,0..1;1,9..144,400..700,0..100,0..1&family=Instrument+Sans:wght@400;500;600;700&family=Courier+Prime:wght@400;700&display=swap">
 <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
 {% if s %}
-<header class="entete {{ 'admin' if s.est_responsable }}">
+{% if s.est_responsable %}<div class="bandeau-admin">Espace du personnel — banque de prêt</div>{% endif %}
+<header class="entete">
   <div class="entete-in">
-    <a class="logo" href="{{ url_for('accueil') }}">{{ icone_logo }}Médiathèque
-      {% if s.est_responsable %}<span class="pastille-admin">RESPONSABLE</span>{% endif %}</a>
+    <a class="logo" href="{{ url_for('accueil') }}">{{ icone_logo }}
+      <span class="logo-nom">{{ nom_mediatheque }}<small>{{ 'Personnel' if s.est_responsable else 'Mon espace lecteur' }}</small></span></a>
     <nav class="nav" aria-label="Navigation principale">
       {% if s.est_responsable %}
-        <a href="{{ url_for('tableau_de_bord') }}" {% if request.endpoint == 'tableau_de_bord' %}aria-current="page"{% endif %}>Tableau de bord</a>
-        <a href="{{ url_for('gestion') }}" {% if request.endpoint == 'gestion' %}aria-current="page"{% endif %}>Catalogue &amp; adhérents</a>
+        <a href="{{ url_for('tableau_de_bord') }}" {% if request.endpoint == 'tableau_de_bord' %}aria-current="page"{% endif %}>Banque de prêt</a>
+        <a href="{{ url_for('gestion') }}" {% if request.endpoint == 'gestion' %}aria-current="page"{% endif %}>Fonds &amp; lecteurs</a>
+        <a href="{{ url_for('catalogue') }}" {% if request.endpoint == 'catalogue' %}aria-current="page"{% endif %}>Rayonnages</a>
       {% else %}
-        <a href="{{ url_for('catalogue') }}" {% if request.endpoint == 'catalogue' %}aria-current="page"{% endif %}>Catalogue</a>
-        <a href="{{ url_for('compte') }}" {% if request.endpoint == 'compte' %}aria-current="page"{% endif %}>Mon compte</a>
+        <a href="{{ url_for('catalogue') }}" {% if request.endpoint == 'catalogue' %}aria-current="page"{% endif %}>Les rayonnages</a>
+        <a href="{{ url_for('compte') }}" {% if request.endpoint == 'compte' %}aria-current="page"{% endif %}>Ma carte</a>
       {% endif %}
     </nav>
     <div class="utilisateur">
-      {% if not s.est_responsable %}<span class="avatar" aria-hidden="true">{{ s.compte.identifiant[:2]|upper }}</span>{% endif %}
-      <span>{{ s.compte.identifiant }}</span>
-      <form method="post" action="{{ url_for('deconnexion') }}">{{ jeton() }}<button class="lien-bouton" type="submit">Déconnexion</button></form>
+      <span class="qui">{{ s.compte.identifiant }}</span>
+      <form method="post" action="{{ url_for('deconnexion') }}">{{ jeton() }}<button class="lien-bouton" type="submit">Se déconnecter</button></form>
     </div>
   </div>
 </header>

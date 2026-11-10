@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block titre %}Mon compte{% endblock %}
+{% block titre %}Ma carte{% endblock %}
 {% block contenu %}
 {% set a = c.adherent %}
 {% set nb_emp = c.emprunts|length %}
@@ -7,83 +7,94 @@
 {% set a_retirer = c.reservations|selectattr('statut', 'equalto', 'disponible')|list %}
 <div class="titre-page">
   <div>
-    <h1>Bonjour {{ a.prenom }}</h1>
-    <p class="muted">Adhérent·e {{ a.numero }} · formule {{ a.type|capitalize }}</p>
+    <span class="surtitre">Carte n° {{ a.numero }} · formule {{ a.type }}</span>
+    <h1>Bonjour {{ a.prenom }}.</h1>
+    <p class="chapo">
+      {% if a_retirer %}Bonne nouvelle&nbsp;: <strong>{{ a_retirer[0].document.titre }}</strong> vous attend à l'accueil jusqu'au {{ a_retirer[0].date_limite_retrait|court }}.
+      {% elif en_retard %}Petit rappel&nbsp;: <strong>{{ en_retard[0].document.titre }}</strong> aurait dû revenir il y a {{ en_retard[0].jours_retard }} jour{{ 's' if en_retard[0].jours_retard > 1 }}.
+      {% elif nb_emp %}Vous avez {{ nb_emp }} document{{ 's' if nb_emp > 1 }} chez vous. Bonne lecture&nbsp;!
+      {% else %}Rien chez vous pour l'instant. <a href="{{ url_for('catalogue') }}">Un petit tour dans les rayons&nbsp;?</a>{% endif %}
+    </p>
   </div>
-  <a href="#mot-de-passe">Changer mon mot de passe</a>
+  <a href="#mot-de-passe" class="small">Changer mon mot de passe</a>
 </div>
 
-<div class="stats">
-  <div class="carte stat">
-    <span class="label">Emprunts en cours</span>
-    <span class="valeur">{{ nb_emp }} <small>/ {{ a.quota }}</small></span>
-    <div class="jauge" role="img" aria-label="{{ nb_emp }} emprunts sur {{ a.quota }}"><span style="width: {{ (100 * nb_emp / a.quota)|round|int }}%"></span></div>
-    <span class="muted small">{% if c.quota_restant > 0 %}Il vous reste {{ c.quota_restant }} emprunt{{ 's' if c.quota_restant > 1 }} possible{{ 's' if c.quota_restant > 1 }}{% else %}Quota atteint{% endif %}</span>
+<div class="resume">
+  <div class="carte chiffre">
+    <span class="label">Chez vous</span>
+    <span class="valeur">{{ nb_emp }} <small>sur {{ a.quota }}</small></span>
+    <div class="cases" role="img" aria-label="{{ nb_emp }} emprunts sur {{ a.quota }} possibles">
+      {% for i in range(a.quota) %}<span class="{{ 'pleine' if i < nb_emp }}"></span>{% endfor %}
+    </div>
+    <span class="muted small">{% if c.quota_restant > 0 %}Encore {{ c.quota_restant }} à emprunter{% else %}Carte pleine pour le moment{% endif %}</span>
   </div>
-  <div class="carte stat">
+  <div class="carte chiffre">
     <span class="label">En retard</span>
     <span class="valeur {{ 'alerte' if en_retard }}">{{ en_retard|length }}</span>
-    <span class="muted small">{% if en_retard %}{{ en_retard[0].document.titre }} : {{ en_retard[0].jours_retard }} j de retard{% else %}Tout est à jour{% endif %}</span>
+    <span class="muted small">{% if en_retard %}À rapporter dès que possible{% else %}Tout est dans les temps, merci&nbsp;!{% endif %}</span>
   </div>
-  <div class="carte stat">
+  <div class="carte chiffre">
     <span class="label">Réservations</span>
-    <span class="valeur">{{ c.reservations|length }} <small>/ 3</small></span>
-    <span class="muted small">{% if a_retirer %}Dont {{ a_retirer|length }} à retirer avant le {{ a_retirer[0].date_limite_retrait|fr }}{% else %}Aucune à retirer{% endif %}</span>
+    <span class="valeur">{{ c.reservations|length }} <small>sur 3</small></span>
+    <span class="muted small">{% if a_retirer %}{{ a_retirer|length }} prête{{ 's' if a_retirer|length > 1 }} à retirer{% else %}Aucune à retirer{% endif %}</span>
   </div>
 </div>
 
-<section class="carte" aria-labelledby="h-emp">
-  <div class="carte-titre"><h2 id="h-emp">Mes emprunts</h2></div>
+<section class="fiche-pret" aria-labelledby="h-emp">
+  <div class="carte-titre"><h2 id="h-emp">Ma fiche de prêt</h2><span class="surtitre">{{ aujourdhui|long }}</span></div>
   {% if c.emprunts %}
   <div class="defile">
     <table>
-      <thead><tr><th>Document</th><th>Emprunté le</th><th>À rendre le</th><th>État</th></tr></thead>
+      <thead><tr><th>Document</th><th>Sorti le</th><th>Retour avant le</th><th><span class="sr">État</span></th></tr></thead>
       <tbody>
       {% for e in c.emprunts %}
         <tr>
-          <td><strong>{{ e.document.titre }}</strong><span class="sous">{{ e.document.TYPE }} · {{ e.document.detail }}</span></td>
-          <td>{{ e.date_emprunt|fr }}</td>
-          <td>{{ e.date_limite|fr }}</td>
+          <td><strong>{{ e.document.titre }}</strong><span class="sous">{{ e.document.detail }} · <span class="mono">{{ cote(e.document) }}</span></span></td>
+          <td class="date">{{ e.date_emprunt|court }}</td>
+          <td class="date">{{ e.date_limite|court }}</td>
           <td>
-            {% if e.jours_retard %}<span class="badge retard">{{ e.jours_retard }} j de retard</span>
-            {% elif e.date_limite == aujourdhui %}<span class="badge attention">À rendre aujourd'hui</span>
-            {% else %}<span class="badge ok">En cours</span>{% endif %}
+            {% if e.jours_retard %}<span class="tampon retard">{{ e.jours_retard }} j de retard</span>
+            {% elif e.date_limite == aujourdhui %}<span class="tampon attention">Aujourd'hui</span>
+            {% endif %}
           </td>
         </tr>
       {% endfor %}
       </tbody>
     </table>
   </div>
-  {% else %}<p class="vide">Aucun emprunt en cours.</p>{% endif %}
+  {% else %}<p class="vide">Votre fiche est vierge. Elle n'attend que vous.</p>{% endif %}
 </section>
 
 <section class="carte" aria-labelledby="h-res">
-  <div class="carte-titre"><h2 id="h-res">Mes réservations</h2></div>
+  <div class="carte-titre"><h2 id="h-res">Ce que j'attends</h2></div>
   {% for r in c.reservations %}
     <div class="ligne-resa">
-      <div class="infos"><strong>{{ r.document.titre }}</strong><span class="muted small">{{ r.document.TYPE }} · {{ r.document.detail }}</span></div>
+      <div class="infos"><strong>{{ r.document.titre }}</strong><span class="muted small">{{ r.document.detail }}</span></div>
       {% if r.statut == 'disponible' %}
-        <span class="badge ok">Prêt à retirer avant le {{ r.date_limite_retrait|fr }}</span>
+        <span class="tampon ok">À retirer avant le {{ r.date_limite_retrait|court }}</span>
       {% else %}
-        <span class="badge en_attente">{{ r.rang }}{{ 'er' if r.rang == 1 else 'e' }} dans la file</span>
+        <span class="tampon en_attente">{{ r.rang }}{{ 'er' if r.rang == 1 else 'e' }} dans la file</span>
       {% endif %}
       <form method="post" action="{{ url_for('annuler', id_document=r.document.id) }}">{{ jeton() }}
-        <button class="btn second petit" type="submit" aria-label="Annuler la réservation de {{ r.document.titre }}">Annuler</button>
+        <button class="btn second petit" type="submit" aria-label="Annuler la réservation de {{ r.document.titre }}">Je n'en veux plus</button>
       </form>
     </div>
   {% else %}
-    <p class="vide">Aucune réservation active. <a href="{{ url_for('catalogue') }}">Parcourir le catalogue</a></p>
+    <p class="vide">Aucune réservation active. Quand un titre est sorti, le bouton « Réserver » vous place dans la file.</p>
   {% endfor %}
 </section>
 
-<section class="carte pad" id="mot-de-passe" aria-labelledby="h-mdp" style="max-width: 520px">
+<section class="carte pad" id="mot-de-passe" aria-labelledby="h-mdp">
   <h2 id="h-mdp">Changer mon mot de passe</h2>
-  <form method="post" action="{{ url_for('changer_mot_de_passe') }}" style="display: flex; flex-direction: column; gap: 14px">
+  <form method="post" action="{{ url_for('changer_mot_de_passe') }}" class="pile">
     {{ jeton() }}
     <div class="champ"><label for="ancien">Mot de passe actuel</label><input id="ancien" name="ancien" type="password" autocomplete="current-password" required></div>
-    <div class="champ"><label for="nouveau">Nouveau mot de passe</label><input id="nouveau" name="nouveau" type="password" autocomplete="new-password" required minlength="8"><span class="aide">8 caractères minimum, avec lettres et chiffres.</span></div>
-    <div class="champ"><label for="confirmation">Confirmation</label><input id="confirmation" name="confirmation" type="password" autocomplete="new-password" required minlength="8"></div>
-    <button class="btn" type="submit">Enregistrer</button>
+    <div class="deux">
+      <div class="champ"><label for="nouveau">Nouveau</label><input id="nouveau" name="nouveau" type="password" autocomplete="new-password" required minlength="8"></div>
+      <div class="champ"><label for="confirmation">Encore une fois</label><input id="confirmation" name="confirmation" type="password" autocomplete="new-password" required minlength="8"></div>
+    </div>
+    <span class="muted small">Au moins 8 caractères, avec des lettres et des chiffres.</span>
+    <div><button class="btn" type="submit">Enregistrer</button></div>
   </form>
 </section>
 {% endblock %}
