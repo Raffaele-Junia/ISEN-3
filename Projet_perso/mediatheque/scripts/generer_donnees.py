@@ -2,7 +2,8 @@
 
     uv run python scripts/generer_donnees.py [dossier] [--graine 42]
 
-Le catalogue (livres, DVD, revues) et les adherents sont ecrits a la main ;
+Le catalogue (livres, DVD, revues) et les adherents sont ecrits a la main ; les
+fiches (genre, themes, resume, editeur, pages) viennent de scripts/fiches_demo.py ;
 l'historique (emprunts, retours, reservations) est obtenu en SIMULANT cinq mois
 d'activite avec le vrai moteur `Mediatheque` : chaque operation respecte donc les
 regles metier (quotas, file d'attente, mise de cote, coherence au chargement).
@@ -17,6 +18,8 @@ from mediatheque.adherents import Adherent
 from mediatheque.documents import DVD, Livre, Revue
 from mediatheque.exceptions import MediathequeError
 from mediatheque.mediatheque import Mediatheque
+
+from fiches_demo import FICHES
 
 LIVRES = [
     ("Les Misérables", 1862, "Victor Hugo"), ("Notre-Dame de Paris", 1831, "Victor Hugo"),
@@ -114,6 +117,10 @@ def construire_catalogue(m):
     for titre, annee, numeros in REVUES:
         for numero in numeros:
             m.ajouter_document(Revue(prochain_id(), titre, annee, numero))
+    for d in m:
+        fiche = FICHES.get(d.titre)
+        if fiche:
+            d.completer_fiche(**fiche)
 
 
 def construire_adherents(m, rng):
@@ -128,6 +135,10 @@ def simuler(m, rng):
     # quelques "gros lecteurs" et des documents plus demandes que d'autres
     activite = {a: rng.choice([0.03, 0.06, 0.06, 0.10, 0.18]) for a in adherents}
     popularite = {d: rng.choice([1, 1, 1, 2, 3, 6]) for d in documents}
+    # chaque lecteur a deux genres de predilection : ses emprunts ont une logique,
+    # ce qui rend les co-emprunts (et donc les recommandations) significatifs
+    genres = sorted({m[d].genre for d in documents if m[d].genre})
+    gouts = {a: set(rng.sample(genres, 2)) for a in adherents}
     # retard "naturel" de chaque adherent : la plupart rendent a temps
     retardataire = {a: rng.random() < 0.2 for a in adherents}
 
@@ -153,7 +164,8 @@ def simuler(m, rng):
             for a in adherents:
                 if rng.random() >= activite[a]:
                     continue
-                cible = rng.choices(documents, weights=[popularite[d] for d in documents])[0]
+                poids = [popularite[d] * (6 if m[d].genre in gouts[a] else 1) for d in documents]
+                cible = rng.choices(documents, weights=poids)[0]
                 try:
                     if m.disponible(cible, a):
                         m.emprunter(cible, a, jour)
