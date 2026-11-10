@@ -22,6 +22,7 @@ from contextlib import contextmanager
 from datetime import date
 from functools import wraps
 from pathlib import Path
+from urllib.parse import urlsplit
 
 from flask import (Flask, Response, abort, flash, g, get_flashed_messages, redirect,
                    render_template, request, session, url_for)
@@ -153,6 +154,16 @@ def create_app(db, secret_key=None, testing=False, *,
     limite_ip = LimiteParIP(tentatives_par_ip, fenetre_ip_s)
 
     # ------------------------------------------------------------ outillage
+    def page_precedente(defaut):
+        """URL interne de retour : le chemin (et la recherche) de la page
+        precedente si elle est sur ce site, sinon la page `defaut`. Jamais
+        de redirection vers un autre site, meme si le CSRF etait assoupli."""
+        precedente = urlsplit(request.referrer or "")
+        if (precedente.scheme in ("http", "https") and precedente.netloc == request.host
+                and precedente.path.startswith("/") and not precedente.path.startswith("//")):
+            return precedente.path + (f"?{precedente.query}" if precedente.query else "")
+        return url_for(defaut)
+
     @contextmanager
     def emplacement_hachage():
         """Un des HACHAGES_SIMULTANES emplacements, ou 503 si le site est sature."""
@@ -262,7 +273,7 @@ def create_app(db, secret_key=None, testing=False, *,
                     if not isinstance(e, (MediathequeError, ValueError)):
                         raise
                     flash(str(e), "erreur")
-                    return redirect(request.referrer or url_for("accueil"))
+                    return redirect(page_precedente("accueil"))
         return enveloppe
 
     @app.before_request
@@ -383,7 +394,7 @@ def create_app(db, secret_key=None, testing=False, *,
     def reserver(id_document):
         g.s.reserver(id_document)
         flash("Réservation enregistrée : le document vous sera mis de côté à son retour.", "ok")
-        return redirect(request.referrer or url_for("catalogue"))
+        return redirect(page_precedente("catalogue"))
 
     @app.post("/annuler/<id_document>")
     @connexion_requise

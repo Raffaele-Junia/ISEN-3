@@ -97,6 +97,20 @@ def test_post_intersite_sans_jeton_meme_avec_referer_externe(web_lea):
     assert "evil.example" not in (r.location or "")
 
 
+@pytest.mark.parametrize("referer", ["https://evil.example/catalogue", "//evil.example/x",
+                                     "http://localhost//evil.example/x", "javascript:alert(1)"])
+def test_redirection_toujours_interne_meme_avec_un_jeton_valide(web_lea, referer):
+    """Recommandation 1 : meme un POST legitime ne suit pas un Referer externe."""
+    r = poster(web_lea, "/reserver/D003", headers={"Referer": referer})
+    assert r.status_code == 302 and r.location == "/catalogue"
+
+
+def test_redirection_garde_la_recherche_du_catalogue(web_lea):
+    r = poster(web_lea, "/reserver/D003",
+               headers={"Referer": "http://localhost/catalogue?q=inception&type=dvd"})
+    assert r.location == "/catalogue?q=inception&type=dvd"
+
+
 # ================================================================= sessions
 def test_cookie_rejoue_apres_deconnexion_refuse(web_app, web_lea):
     cookie = web_lea.get_cookie("session").value
