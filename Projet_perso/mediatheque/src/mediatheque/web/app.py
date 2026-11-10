@@ -186,13 +186,13 @@ def create_app(db, secret_key=None, testing=False):
             type_doc = None
         tous = g.s.catalogue()
         resultats = g.s.catalogue(texte, type_doc)
-        mes_reservations = set()
+        a_moi = {}
         if not g.s.est_responsable:
             compte = g.s.mon_compte()
-            mes_reservations = {r["document"].id for r in compte["reservations"]}
-            mes_reservations |= {e["document"].id for e in compte["emprunts"]}
+            a_moi = {r["document"].id: "Réservé ✓" for r in compte["reservations"]}
+            a_moi |= {e["document"].id: "Chez vous" for e in compte["emprunts"]}
         lignes = [{"doc": d, "statut": st, "attente": g.s.file_attente(d.id),
-                   "deja": d.id in mes_reservations} for d, st in resultats]
+                   "a_moi": a_moi.get(d.id)} for d, st in resultats]
         return render_template(
             "catalogue.html", lignes=lignes, texte=texte, type_doc=type_doc,
             total=len(tous), dispo=sum(1 for _, st in tous if st == "disponible"))
@@ -384,3 +384,7 @@ def main():
     app = create_app(args.db)
     print(f"Site disponible sur http://127.0.0.1:{args.port}")
     app.run(host="127.0.0.1", port=args.port, debug=False)
+
+
+if __name__ == "__main__":
+    main()

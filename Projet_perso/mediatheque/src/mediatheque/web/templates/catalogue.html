@@ -44,8 +44,8 @@
         {% else %}{{ l.attente }} personne{{ 's' if l.attente > 1 }} en attente{% endif %}
       </span>
       {% if not s.est_responsable and l.statut != 'disponible' %}
-        {% if l.deja %}
-          <span class="btn petit fait">Dans mon compte</span>
+        {% if l.a_moi %}
+          <span class="btn petit fait">{{ l.a_moi }}</span>
         {% else %}
           <form method="post" action="{{ url_for('reserver', id_document=d.id) }}">{{ jeton() }}
             <button class="btn petit" type="submit" aria-label="Réserver {{ d.titre }}">Réserver</button>
