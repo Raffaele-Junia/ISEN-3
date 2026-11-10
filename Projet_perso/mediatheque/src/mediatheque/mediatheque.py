@@ -2,6 +2,7 @@ from datetime import date
 from pathlib import Path
 
 from . import stockage_sqlite
+from .auth import ADHERENT, GestionComptes
 from .emprunt import Emprunt
 from .exceptions import (AdherentInconnuError, DocumentIndisponibleError,
                          DocumentInconnuError, QuotaDepasseError, MediathequeError,
@@ -22,6 +23,7 @@ class Mediatheque:
         self._adherents = {}
         self._emprunts = []
         self._reservations = []
+        self.comptes = GestionComptes()
         self._source = None
 
     # ------------------------------------------------------------------ ajout
@@ -42,6 +44,30 @@ class Mediatheque:
     def ajouter_reservation(self, reservation):
         self._verifier_references(reservation.id_document, reservation.numero_adherent)
         self._reservations.append(reservation)
+
+    def ajouter_compte(self, compte):
+        if compte.numero_adherent is not None and compte.numero_adherent not in self._adherents:
+            raise AdherentInconnuError(compte.numero_adherent)
+        if compte.role == ADHERENT and self.comptes.compte_de_adherent(compte.numero_adherent):
+            raise MediathequeError(
+                f"l'adherent {compte.numero_adherent} a deja un compte")
+        self.comptes.ajouter(compte)
+
+    def creer_compte(self, identifiant, mot_de_passe, role, numero_adherent=None):
+        if numero_adherent is not None:
+            self.adherent(numero_adherent)  # leve AdherentInconnuError
+            if self.comptes.compte_de_adherent(numero_adherent):
+                raise MediathequeError(f"l'adherent {numero_adherent} a deja un compte")
+        return self.comptes.creer(identifiant, mot_de_passe, role, numero_adherent)
+
+    def supprimer_document(self, id_document):
+        if id_document not in self._documents:
+            raise DocumentInconnuError(id_document)
+        if (any(e.id_document == id_document for e in self._emprunts)
+                or any(r.id_document == id_document for r in self._reservations)):
+            raise MediathequeError(
+                "document avec un historique d'emprunts ou de reservations : suppression refusee")
+        return self._documents.pop(id_document)
 
     def _verifier_references(self, id_document, numero):
         if id_document not in self._documents:
@@ -77,6 +103,8 @@ class Mediatheque:
             m.ajouter_emprunt(emprunt)
         for reservation in donnees["reservations"] or ():
             m.ajouter_reservation(reservation)
+        for compte in donnees.get("comptes", ()):
+            m.ajouter_compte(compte)
         return m
 
     def sauvegarder(self, destination=None):
@@ -87,8 +115,11 @@ class Mediatheque:
             destination.parent.mkdir(parents=True, exist_ok=True)
             stockage_sqlite.sauvegarder(destination, self._documents.values(),
                                         self._adherents.values(), self._emprunts,
-                                        self._reservations)
+                                        self._reservations, self.comptes)
             return
+        if len(self.comptes):
+            raise MediathequeError(
+                "les comptes ne peuvent etre sauvegardes qu'en SQLite (fichier .db)")
         destination.mkdir(parents=True, exist_ok=True)
         ecrire_documents(destination / "documents.csv", self._documents.values())
         ecrire_adherents(destination / "adherents.csv", self._adherents.values())

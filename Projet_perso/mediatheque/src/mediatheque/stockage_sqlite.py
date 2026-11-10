@@ -9,6 +9,7 @@ from contextlib import closing
 from datetime import date
 
 from .adherents import Adherent
+from .auth import Compte
 from .documents import Document
 from .emprunt import Emprunt
 from .reservation import Reservation
@@ -43,6 +44,13 @@ CREATE TABLE IF NOT EXISTS reservations (
                      ('en_attente', 'disponible', 'honoree', 'annulee', 'expiree')),
     date_disponible  TEXT
 );
+CREATE TABLE IF NOT EXISTS comptes (
+    identifiant      TEXT PRIMARY KEY,
+    hash_mdp         BLOB NOT NULL,
+    sel              BLOB NOT NULL,
+    role             TEXT NOT NULL CHECK (role IN ('adherent', 'responsable')),
+    numero_adherent  TEXT REFERENCES adherents(numero)
+);
 """
 
 
@@ -54,7 +62,7 @@ def connecter(chemin):
 
 
 def charger(chemin):
-    """Renvoie un dict {documents, adherents, emprunts, reservations}."""
+    """Renvoie un dict {documents, adherents, emprunts, reservations, comptes}."""
     with closing(connecter(chemin)) as con:
         con.row_factory = sqlite3.Row
         documents = [Document.from_csv_row(dict(r)) for r in
@@ -70,13 +78,18 @@ def charger(chemin):
                         for r in con.execute(
                             "SELECT id_document, numero_adherent, date_reservation, statut, "
                             "date_disponible FROM reservations ORDER BY id")]
-    return {"documents": documents, "adherents": adherents,
-            "emprunts": emprunts, "reservations": reservations}
+        comptes = [Compte(r["identifiant"], bytes(r["hash_mdp"]), bytes(r["sel"]),
+                          r["role"], r["numero_adherent"])
+                   for r in con.execute("SELECT identifiant, hash_mdp, sel, role, "
+                                        "numero_adherent FROM comptes")]
+    return {"documents": documents, "adherents": adherents, "emprunts": emprunts,
+            "reservations": reservations, "comptes": comptes}
 
 
-def sauvegarder(chemin, documents, adherents, emprunts, reservations=()):
+def sauvegarder(chemin, documents, adherents, emprunts, reservations=(), comptes=()):
     with closing(connecter(chemin)) as con:
         with con:  # transaction : commit si tout passe, rollback sinon
+            con.execute("DELETE FROM comptes")
             con.execute("DELETE FROM reservations")
             con.execute("DELETE FROM emprunts")
             con.execute("DELETE FROM documents")
@@ -97,6 +110,11 @@ def sauvegarder(chemin, documents, adherents, emprunts, reservations=()):
                 "statut, date_disponible) VALUES (?, ?, ?, ?, ?)",
                 [(r.id_document, r.numero_adherent, r.date_reservation.isoformat(),
                   r.statut, _iso(r.date_disponible)) for r in reservations])
+            con.executemany(
+                "INSERT INTO comptes (identifiant, hash_mdp, sel, role, numero_adherent) "
+                "VALUES (?, ?, ?, ?, ?)",
+                [(c.identifiant, c.hash_mdp, c.sel, c.role, c.numero_adherent)
+                 for c in comptes])
 
 
 def _iso(d: date | None):

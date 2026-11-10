@@ -24,6 +24,23 @@ class ReservationImpossibleError(MediathequeError):
     """Reservation refusee (document disponible, doublon, limite atteinte...)."""
 
 
+class AuthentificationError(MediathequeError):
+    """Identifiant ou mot de passe incorrect (message volontairement vague)."""
+
+    def __init__(self, message="identifiant ou mot de passe incorrect"):
+        super().__init__(message)
+
+
+class CompteBloqueError(AuthentificationError):
+    def __init__(self, secondes_restantes):
+        self.secondes_restantes = secondes_restantes
+        super().__init__(f"trop de tentatives, reessayez dans {secondes_restantes} s")
+
+
+class AccesRefuseError(MediathequeError):
+    """Action interdite pour le role de l'utilisateur connecte."""
+
+
 class QuotaDepasseError(MediathequeError):
     def __init__(self, nb_actuel, quota):
         self.nb_actuel = nb_actuel
