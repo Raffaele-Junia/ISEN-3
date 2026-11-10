@@ -27,12 +27,21 @@
 </form>
 
 {% if genres %}
-<nav class="genres" aria-label="Genres">
-  {% for nom, nb in genres %}
-    <a href="{{ url_for('catalogue', genre=nom, q=texte or None) }}" {% if genre == nom %}aria-current="true"{% endif %}>{{ nom }} <span>{{ nb }}</span></a>
-  {% endfor %}
-  {% if genre %}<a class="effacer" href="{{ url_for('catalogue', q=texte or None, type=type_doc) }}">× tous les genres</a>{% endif %}
-</nav>
+<div class="barre-filtres">
+  <details class="filtre-genres"{% if genre %} open{% endif %}>
+    <summary>
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 5h18l-7 8v6l-4-2v-4z"/></svg>
+      Filtrer par genre
+      {% if genre %}<span class="filtre-actif">{{ genre }}</span>{% else %}<span class="filtre-nb">{{ genres|length }}</span>{% endif %}
+    </summary>
+    <nav class="genres" aria-label="Genres">
+      {% for nom, nb in genres %}
+        <a href="{{ url_for('catalogue', genre=nom, q=texte or None) }}" {% if genre == nom %}aria-current="true"{% endif %}>{{ nom }} <span>{{ nb }}</span></a>
+      {% endfor %}
+    </nav>
+  </details>
+  {% if genre %}<a class="effacer-filtre" href="{{ url_for('catalogue', q=texte or None, type=type_doc) }}">Retirer le filtre « {{ genre }} »</a>{% endif %}
+</div>
 {% endif %}
 
 {% if texte or type_doc or genre %}<p class="compte-resultats">{{ lignes|length }} résultat{{ 's' if lignes|length > 1 }}{% if texte %} pour « {{ texte }} »{% endif %}{% if genre %} · {{ genre }}{% endif %}</p>{% endif %}
