@@ -142,8 +142,20 @@ def test_adherent_interdit_en_admin(lea):
 def test_changer_mot_de_passe(app, lea):
     post(lea, "/compte/mot-de-passe", page="/compte",
          ancien=MDP, nouveau="Nouveau456", confirmation="Nouveau456")
-    assert lea.get("/compte").status_code == 200  # toujours connectee
+    page = lea.get("/compte")
+    assert page.status_code == 200  # toujours connectee
+    texte = page.get_data(as_text=True)
+    assert "Mot de passe modifié" in texte and 'class="message erreur"' not in texte
+    post(lea, "/reserver/D003")  # la session reste pleinement utilisable
+    assert "Réservation enregistrée" in lea.get("/catalogue").get_data(as_text=True)
     assert connecter(app.test_client(), "lea", "Nouveau456").status_code == 302
+
+
+def test_session_revoquee_par_le_responsable(app, admin, lea):
+    post(admin, "/admin/comptes/mot-de-passe", page="/admin/gestion?onglet=adherents",
+         identifiant="lea", mot_de_passe="Reinit1234")
+    r = lea.get("/catalogue")
+    assert r.status_code == 302 and r.location.endswith("/connexion")
 
 
 def test_xss_echappe(admin, app):

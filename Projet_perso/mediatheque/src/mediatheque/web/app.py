@@ -24,7 +24,7 @@ from markupsafe import Markup
 from ..auth import ADHERENT
 from ..exceptions import AuthentificationError, MediathequeError
 from ..mediatheque import Mediatheque
-from ..session import Session, ouvrir_session
+from ..session import ouvrir_session
 
 TYPES = [("livre", "Livre"), ("dvd", "DVD"), ("revue", "Revue")]
 LIBELLE_EXTRA = {"livre": "Auteur", "dvd": "Durée (min)", "revue": "Numéro"}
@@ -62,7 +62,9 @@ def create_app(db, secret_key=None, testing=False):
 
     # ------------------------------------------------------------ outillage
     def compte_enregistre(compte):
-        return any(c == compte for c in m.comptes)
+        # session revoquee (compte supprime, role ou mot de passe change par le
+        # responsable) : on deconnecte proprement au lieu d'une erreur 500
+        return m.comptes.get(compte.identifiant) == compte
 
     def session_courante():
         jeton = session.get("jeton")
@@ -231,9 +233,7 @@ def create_app(db, secret_key=None, testing=False):
             g.s.changer_mot_de_passe(request.form.get("ancien", ""), nouveau)
         except AuthentificationError:
             raise MediathequeError("mot de passe actuel incorrect") from None
-        # le compte a change : reconnecter proprement la session courante
-        compte = next(c for c in m.comptes if c.identifiant == g.s.compte.identifiant)
-        sessions_actives[session["jeton"]] = Session(m, compte)
+        # la Session met elle-meme son compte a jour (S4) : rien a reconstruire
         flash("Mot de passe modifié.", "ok")
         return redirect(url_for("compte"))
 
