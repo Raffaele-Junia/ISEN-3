@@ -218,12 +218,22 @@ def create_app(db, secret_key=None, testing=False, *,
         horodatage[jeton][1] = maintenant
         return s
 
-    def connexion_requise(vue):
+    def connexion_requise(vue=None, *, sous_verrou=True):
+        """Session valide exigee. La vue s'execute sous `verrou` (W5) : meme une
+        page GET peut modifier l'etat (mon_compte -> actualiser_reservations).
+        `sous_verrou=False` : seulement pour une vue qui hache un mot de passe
+        (W1) et prend elle-meme le verrou pour modifier ou sauvegarder."""
+        if vue is None:
+            return lambda v: connexion_requise(v, sous_verrou=sous_verrou)
+
         @wraps(vue)
         def enveloppe(*args, **kwargs):
-            g.s = session_courante()
-            if g.s is None:
-                return redirect(url_for("connexion"))
+            with verrou:
+                g.s = session_courante()
+                if g.s is None:
+                    return redirect(url_for("connexion"))
+                if sous_verrou:
+                    return vue(*args, **kwargs)
             return vue(*args, **kwargs)
         return enveloppe
 
@@ -295,7 +305,8 @@ def create_app(db, secret_key=None, testing=False, *,
     # --------------------------------------------------------- connexion
     @app.get("/")
     def accueil():
-        s = session_courante()
+        with verrou:  # registre des sessions partage entre les threads
+            s = session_courante()
         if s is None:
             return redirect(url_for("connexion"))
         return redirect(url_for("tableau_de_bord" if s.est_responsable else "catalogue"))
@@ -338,8 +349,9 @@ def create_app(db, secret_key=None, testing=False, *,
     @app.post("/deconnexion")
     def deconnexion():
         jeton = session.get("jeton")
-        if jeton in sessions_actives:
-            retirer(jeton)
+        with verrou:
+            if jeton in sessions_actives:
+                retirer(jeton)
         session.clear()
         return redirect(url_for("connexion"))
 
@@ -388,7 +400,7 @@ def create_app(db, secret_key=None, testing=False, *,
         return render_template("compte.html", c=g.s.mon_compte())
 
     @app.post("/compte/mot-de-passe")
-    @connexion_requise
+    @connexion_requise(sous_verrou=False)
     def changer_mot_de_passe():
         # Pas de @action : les deux scrypt se font HORS du verrou global (W1),
         # sous le semaphore ; seule la sauvegarde prend le verrou.

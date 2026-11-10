@@ -216,8 +216,6 @@ def test_w4_echec_de_sauvegarde_recharge_en_place(web_app, web_admin, web_lea, m
 
 
 
-@pytest.mark.xfail(strict=True, reason="faille W5 : les pages GET (/compte, /catalogue, "
-                   "/admin) modifient l'etat (actualiser_reservations) sans prendre le verrou")
 def test_w5_get_qui_modifie_l_etat_prend_le_verrou(web_app, web_lea, monkeypatch):
     m = web_app.extensions["mediatheque"]
     verrou = variable_interne(web_app, "verrou")
@@ -229,6 +227,22 @@ def test_w5_get_qui_modifie_l_etat_prend_le_verrou(web_app, web_lea, monkeypatch
         return vrai(jour)
     monkeypatch.setattr(m, "actualiser_reservations", espion)
     assert web_lea.get("/compte").status_code == 200
+    assert tenu and all(tenu)
+
+
+@pytest.mark.parametrize("url", ["/catalogue", "/admin", "/admin/gestion"])
+def test_w5_autres_pages_sous_le_verrou(web_app, web_admin, web_lea, monkeypatch, url):
+    m = web_app.extensions["mediatheque"]
+    verrou = variable_interne(web_app, "verrou")
+    tenu = []
+    vrai = m.actualiser_reservations
+
+    def espion(jour):
+        tenu.append(verrou_tenu(verrou))
+        return vrai(jour)
+    monkeypatch.setattr(m, "actualiser_reservations", espion)
+    client = web_lea if url == "/catalogue" else web_admin
+    assert client.get(url).status_code == 200
     assert tenu and all(tenu)
 
 
