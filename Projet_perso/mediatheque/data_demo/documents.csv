@@ -1,0 +1,137 @@
+id,type,titre,annee,extra
+D001,livre,Les Misérables,1862,Victor Hugo
+D002,livre,Notre-Dame de Paris,1831,Victor Hugo
+D003,livre,Madame Bovary,1857,Gustave Flaubert
+D004,livre,Germinal,1885,Émile Zola
+D005,livre,L'Assommoir,1877,Émile Zola
+D006,livre,Le Rouge et le Noir,1830,Stendhal
+D007,livre,Le Père Goriot,1835,Honoré de Balzac
+D008,livre,Le Comte de Monte-Cristo,1844,Alexandre Dumas
+D009,livre,Les Trois Mousquetaires,1844,Alexandre Dumas
+D010,livre,Bel-Ami,1885,Guy de Maupassant
+D011,livre,Du côté de chez Swann,1913,Marcel Proust
+D012,livre,Voyage au bout de la nuit,1932,Louis-Ferdinand Céline
+D013,livre,L'Étranger,1942,Albert Camus
+D014,livre,La Peste,1947,Albert Camus
+D015,livre,Le Petit Prince,1943,Antoine de Saint-Exupéry
+D016,livre,Vol de nuit,1931,Antoine de Saint-Exupéry
+D017,livre,La Condition humaine,1933,André Malraux
+D018,livre,Bonjour tristesse,1954,Françoise Sagan
+D019,livre,Les Choses,1965,Georges Perec
+D020,livre,W ou le Souvenir d'enfance,1975,Georges Perec
+D021,livre,Zazie dans le métro,1959,Raymond Queneau
+D022,livre,La Vie devant soi,1975,Romain Gary
+D023,livre,Les Années,2008,Annie Ernaux
+D024,livre,La Place,1983,Annie Ernaux
+D025,livre,L'Amant,1984,Marguerite Duras
+D026,livre,Le Grand Meaulnes,1913,Alain-Fournier
+D027,livre,Thérèse Raquin,1867,Émile Zola
+D028,livre,Candide,1759,Voltaire
+D029,livre,Vingt mille lieues sous les mers,1870,Jules Verne
+D030,livre,Le Tour du monde en quatre-vingts jours,1872,Jules Verne
+D031,livre,Chanson douce,2016,Leïla Slimani
+D032,livre,L'Anomalie,2020,Hervé Le Tellier
+D033,livre,Au revoir là-haut,2013,Pierre Lemaitre
+D034,livre,Petit Pays,2016,Gaël Faye
+D035,livre,Le Consentement,2020,Vanessa Springora
+D036,livre,Changer l'eau des fleurs,2018,Valérie Perrin
+D037,livre,Les Bienveillantes,2006,Jonathan Littell
+D038,livre,Riquet à la houppe,2016,Amélie Nothomb
+D039,livre,Stupeur et Tremblements,1999,Amélie Nothomb
+D040,livre,Vernon Subutex,2015,Virginie Despentes
+D041,livre,1984,1949,George Orwell
+D042,livre,La Ferme des animaux,1945,George Orwell
+D043,livre,Le Meilleur des mondes,1932,Aldous Huxley
+D044,livre,Fahrenheit 451,1953,Ray Bradbury
+D045,livre,Dune,1965,Frank Herbert
+D046,livre,Fondation,1951,Isaac Asimov
+D047,livre,Le Seigneur des anneaux,1954,J. R. R. Tolkien
+D048,livre,Le Hobbit,1937,J. R. R. Tolkien
+D049,livre,Harry Potter à l'école des sorciers,1997,J. K. Rowling
+D050,livre,Orgueil et Préjugés,1813,Jane Austen
+D051,livre,Jane Eyre,1847,Charlotte Brontë
+D052,livre,Les Hauts de Hurlevent,1847,Emily Brontë
+D053,livre,Crime et Châtiment,1866,Fiodor Dostoïevski
+D054,livre,Anna Karénine,1877,Léon Tolstoï
+D055,livre,Cent ans de solitude,1967,Gabriel García Márquez
+D056,livre,Le Vieil Homme et la Mer,1952,Ernest Hemingway
+D057,livre,Des souris et des hommes,1937,John Steinbeck
+D058,livre,Les Raisins de la colère,1939,John Steinbeck
+D059,livre,Beloved,1987,Toni Morrison
+D060,livre,La Route,2006,Cormac McCarthy
+D061,livre,Le Nom de la rose,1980,Umberto Eco
+D062,livre,L'Insoutenable Légèreté de l'être,1984,Milan Kundera
+D063,livre,Kafka sur le rivage,2002,Haruki Murakami
+D064,livre,Norwegian Wood,1987,Haruki Murakami
+D065,livre,L'Alchimiste,1988,Paulo Coelho
+D066,livre,Le Parfum,1985,Patrick Süskind
+D067,livre,Sapiens,2011,Yuval Noah Harari
+D068,livre,Une brève histoire du temps,1988,Stephen Hawking
+D069,livre,Le Deuxième Sexe,1949,Simone de Beauvoir
+D070,livre,Tristes Tropiques,1955,Claude Lévi-Strauss
+D071,livre,Fluent Python,2022,Luciano Ramalho
+D072,livre,Clean Code,2008,Robert C. Martin
+D073,livre,Design Patterns,1994,Erich Gamma
+D074,livre,The Pragmatic Programmer,2019,David Thomas
+D075,livre,Structure and Interpretation of Computer Programs,1996,Harold Abelson
+D076,livre,Introduction to Algorithms,2022,Thomas H. Cormen
+D077,livre,Automate the Boring Stuff with Python,2019,Al Sweigart
+D078,livre,Astérix le Gaulois,1961,René Goscinny
+D079,livre,Tintin au Tibet,1960,Hergé
+D080,livre,Persepolis,2000,Marjane Satrapi
+D081,livre,Maus,1986,Art Spiegelman
+D082,livre,L'Arabe du futur,2014,Riad Sattouf
+D083,livre,Blacksad,2000,Juan Díaz Canales
+D084,dvd,Inception,2010,148
+D085,dvd,Interstellar,2014,169
+D086,dvd,Le Fabuleux Destin d'Amélie Poulain,2001,122
+D087,dvd,Intouchables,2011,112
+D088,dvd,La Haine,1995,98
+D089,dvd,Les Quatre Cents Coups,1959,99
+D090,dvd,À bout de souffle,1960,90
+D091,dvd,Le Dîner de cons,1998,80
+D092,dvd,La Cité de la peur,1994,93
+D093,dvd,"OSS 117 : Le Caire, nid d'espions",2006,99
+D094,dvd,Le Voyage de Chihiro,2001,125
+D095,dvd,Mon voisin Totoro,1988,86
+D096,dvd,Princesse Mononoké,1997,134
+D097,dvd,Parasite,2019,132
+D098,dvd,Pulp Fiction,1994,154
+D099,dvd,Le Parrain,1972,175
+D100,dvd,Retour vers le futur,1985,116
+D101,dvd,Matrix,1999,136
+D102,dvd,Le Seigneur des anneaux : La Communauté de l'anneau,2001,178
+D103,dvd,Ratatouille,2007,111
+D104,dvd,WALL-E,2008,98
+D105,dvd,La La Land,2016,128
+D106,dvd,Portrait de la jeune fille en feu,2019,122
+D107,dvd,Anatomie d'une chute,2023,151
+D108,dvd,Les Choristes,2004,97
+D109,dvd,Le Grand Bleu,1988,168
+D110,dvd,Astérix et Obélix : Mission Cléopâtre,2002,107
+D111,dvd,Shining,1980,146
+D112,dvd,Alien,1979,117
+D113,dvd,Blade Runner,1982,117
+D114,revue,Science et Vie,2026,1295
+D115,revue,Science et Vie,2026,1296
+D116,revue,Science et Vie,2026,1297
+D117,revue,Science et Vie,2026,1298
+D118,revue,Sciences et Avenir,2026,935
+D119,revue,Sciences et Avenir,2026,936
+D120,revue,Sciences et Avenir,2026,937
+D121,revue,Courrier international,2026,1820
+D122,revue,Courrier international,2026,1821
+D123,revue,Courrier international,2026,1822
+D124,revue,Le Monde diplomatique,2026,866
+D125,revue,Le Monde diplomatique,2026,867
+D126,revue,Philosophie Magazine,2026,193
+D127,revue,Philosophie Magazine,2026,194
+D128,revue,Géo,2026,559
+D129,revue,Géo,2026,560
+D130,revue,Pour la Science,2026,575
+D131,revue,Pour la Science,2026,576
+D132,revue,Télérama,2026,3901
+D133,revue,Télérama,2026,3902
+D134,revue,L'Histoire,2026,535
+D135,revue,Epsiloon,2026,52
+D136,revue,Epsiloon,2026,53

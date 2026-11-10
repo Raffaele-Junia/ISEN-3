@@ -1,39 +1,49 @@
 """Cree une base de DEMONSTRATION avec des comptes de test (jamais en production).
 
-    uv run python scripts/creer_demo.py [chemin.db]
+    uv run python scripts/creer_demo.py [chemin.db] [--depuis data_demo]
 
+Par defaut, elle part du jeu genere par scripts/generer_donnees.py (data_demo/).
 Comptes crees (mots de passe de test, a ne jamais reutiliser ailleurs) :
-    admin / Demo1234  (responsable)
-    lea   / Demo1234  (adherente A001)
-    hugo  / Demo1234  (adherent A002)
-    ines  / Demo1234  (adherente A003)
+    admin             / Demo1234  (responsable)
+    prenom.nom        / Demo1234  pour CHAQUE adherent, sans accents
+                                  (ex. lea.martin, hugo.durand, ines.petit)
+Compter ~0,5 s par compte : le hachage scrypt est volontairement lent.
 """
+import argparse
+import re
 import sys
-from datetime import date, timedelta
+import unicodedata
 from pathlib import Path
 
 from mediatheque.auth import ADHERENT, RESPONSABLE
 from mediatheque.mediatheque import Mediatheque
 
 MDP_DEMO = "Demo1234"
+RACINE = Path(__file__).resolve().parent.parent
+
+
+def identifiant(adherent):
+    brut = f"{adherent.prenom}.{adherent.nom}"
+    sans_accents = unicodedata.normalize("NFKD", brut).encode("ascii", "ignore").decode()
+    return re.sub(r"[^a-z0-9.]+", "-", sans_accents.lower()).strip("-")[:32]
 
 
 def main():
-    cible = Path(sys.argv[1] if len(sys.argv) > 1 else "demo.db")
+    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    parser.add_argument("cible", nargs="?", default="demo.db")
+    parser.add_argument("--depuis", default=str(RACINE / "data_demo"))
+    args = parser.parse_args()
+
+    cible = Path(args.cible)
     if cible.exists():
         sys.exit(f"{cible} existe deja")
-    m = Mediatheque.charger(Path(__file__).resolve().parent.parent / "data")
+    m = Mediatheque.charger(args.depuis)
     m.creer_compte("admin", MDP_DEMO, RESPONSABLE)
-    for ident, numero in (("lea", "A001"), ("hugo", "A002"), ("ines", "A003")):
-        m.creer_compte(ident, MDP_DEMO, ADHERENT, numero)
-    hier = date.today() - timedelta(days=1)
-    for id_doc, numero in (("D004", "A002"), ("D003", "A003"), ("D001", "A003")):
-        try:
-            m.reserver(id_doc, numero, hier)
-        except Exception as e:  # selon l'etat des donnees
-            print(f"reservation {id_doc}/{numero} ignoree : {e}")
+    for a in m.adherents:
+        m.creer_compte(identifiant(a), MDP_DEMO, ADHERENT, a.numero)
     m.sauvegarder(cible)
-    print(f"Base de demo creee : {cible}")
+    print(f"Base de demo creee : {cible} ({len(m)} documents, "
+          f"{len(m.adherents)} adherents, {len(m.comptes)} comptes)")
 
 
 if __name__ == "__main__":
