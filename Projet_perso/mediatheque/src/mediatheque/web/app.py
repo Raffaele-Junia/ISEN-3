@@ -23,8 +23,8 @@ from datetime import date
 from functools import wraps
 from pathlib import Path
 
-from flask import (Flask, Response, abort, flash, g, redirect, render_template,
-                   request, session, url_for)
+from flask import (Flask, Response, abort, flash, g, get_flashed_messages, redirect,
+                   render_template, request, session, url_for)
 from markupsafe import Markup
 
 from ..auth import ADHERENT
@@ -85,6 +85,9 @@ HACHAGES_SIMULTANES = 2      # scrypt N=2**17 : 128 Mo de memoire par calcul
 ATTENTE_HACHAGE_S = 3        # au-dela, 503 (site sature)
 TENTATIVES_PAR_IP = 10       # tentatives de connexion par adresse...
 FENETRE_IP_S = 60            # ...sur une fenetre glissante d'une minute
+INACTIVITE_S = 30 * 60       # session fermee apres 30 min sans requete
+DUREE_MAX_S = 12 * 3600      # et dans tous les cas 12 h apres la connexion
+MESSAGE_EXPIRATION = "session expirée, reconnectez-vous"
 
 
 class LimiteParIP:
@@ -123,7 +126,8 @@ class LimiteParIP:
 
 def create_app(db, secret_key=None, testing=False, *,
                attente_hachage_s=ATTENTE_HACHAGE_S,
-               tentatives_par_ip=TENTATIVES_PAR_IP, fenetre_ip_s=FENETRE_IP_S):
+               tentatives_par_ip=TENTATIVES_PAR_IP, fenetre_ip_s=FENETRE_IP_S,
+               inactivite_s=INACTIVITE_S, duree_max_s=DUREE_MAX_S):
     db = Path(db)
     if not db.exists():
         raise FileNotFoundError(
@@ -136,11 +140,15 @@ def create_app(db, secret_key=None, testing=False, *,
         SESSION_COOKIE_SAMESITE="Lax",
         SESSION_COOKIE_SECURE=os.environ.get("MEDIATHEQUE_HTTPS") == "1",
         MAX_CONTENT_LENGTH=64 * 1024,
+        # le cookie signe lui-meme est refuse au-dela de la duree maximale ; il
+        # reste un cookie de navigateur (non permanent), efface a la fermeture
+        PERMANENT_SESSION_LIFETIME=duree_max_s,
         TESTING=testing,
     )
     m = Mediatheque.charger(db)
     verrou = threading.RLock()
     sessions_actives = {}  # jeton -> Session (cote serveur)
+    horodatage = {}        # jeton -> [cree_le, vu_le] (time.monotonic) (W2)
     hachage = threading.BoundedSemaphore(HACHAGES_SIMULTANES)  # jamais sous `verrou` (W1)
     limite_ip = LimiteParIP(tentatives_par_ip, fenetre_ip_s)
 
@@ -160,13 +168,40 @@ def create_app(db, secret_key=None, testing=False, *,
         # responsable) : on deconnecte proprement au lieu d'une erreur 500
         return m.comptes.get(compte.identifiant) == compte
 
+    def expiree(jeton, maintenant):
+        cree, vu = horodatage.get(jeton, (float("-inf"), float("-inf")))
+        return maintenant - vu > inactivite_s or maintenant - cree > duree_max_s
+
+    def retirer(jeton):
+        s = sessions_actives.pop(jeton, None)
+        horodatage.pop(jeton, None)
+        if s is not None:
+            s.fermer()
+
+    def enregistrer(s):
+        jeton = secrets.token_urlsafe(32)
+        maintenant = time.monotonic()
+        sessions_actives[jeton] = s
+        horodatage[jeton] = [maintenant, maintenant]
+        return jeton
+
     def session_courante():
         jeton = session.get("jeton")
         s = sessions_actives.get(jeton) if jeton else None
-        if s is not None and not compte_enregistre(s.compte):
+        if s is None:
+            return None
+        maintenant = time.monotonic()
+        if expiree(jeton, maintenant):
+            # inactivite ou duree maximale depassee (W2) : message neutre
+            retirer(jeton)
+            session.pop("jeton", None)
+            flash(MESSAGE_EXPIRATION, "expiration")
+            return None
+        if not compte_enregistre(s.compte):
             # compte supprime ou mot de passe change ailleurs : on deconnecte
-            sessions_actives.pop(jeton, None)
-            s = None
+            retirer(jeton)
+            return None
+        horodatage[jeton][1] = maintenant
         return s
 
     def connexion_requise(vue):
@@ -269,20 +304,22 @@ def create_app(db, secret_key=None, testing=False, *,
             else:
                 limite_ip.oublier(adresse, tentative)  # une reussite ne compte pas
                 ancien = session.pop("jeton", None)
-                sessions_actives.pop(ancien, None)
+                retirer(ancien)
                 session.clear()  # nouvelle session : evite la fixation de session
-                jeton = secrets.token_urlsafe(32)
-                sessions_actives[jeton] = s
-                session["jeton"] = jeton
+                session["jeton"] = enregistrer(s)
                 session["csrf"] = secrets.token_urlsafe(32)
                 return redirect(url_for("accueil"))
+        else:
+            # la page de connexion n'affiche pas les messages flash du gabarit :
+            # le message d'expiration (W2) passe par l'emplacement d'erreur
+            erreur = next(iter(get_flashed_messages(category_filter=["expiration"])), None)
         return render_template("connexion.html", erreur=erreur, identifiant=identifiant)
 
     @app.post("/deconnexion")
     def deconnexion():
-        s = sessions_actives.pop(session.get("jeton"), None)
-        if s is not None:
-            s.fermer()
+        jeton = session.get("jeton")
+        if jeton in sessions_actives:
+            retirer(jeton)
         session.clear()
         return redirect(url_for("connexion"))
 

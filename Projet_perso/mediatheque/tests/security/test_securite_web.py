@@ -132,8 +132,6 @@ def test_cookie_httponly_samesite_et_secure_si_https(web_db, monkeypatch):
     assert "HttpOnly" in cookie and "SameSite=Lax" in cookie and "Secure" in cookie
 
 
-@pytest.mark.xfail(strict=True, reason="faille W2 : aucune expiration des sessions "
-                   "(ni inactivite ni duree absolue) ; un cookie vole reste valide indefiniment")
 def test_w2_session_expire_apres_une_longue_inactivite(web_lea, monkeypatch):
     assert web_lea.get("/catalogue").status_code == 200
     plus_tard = time.time() + 7 * 24 * 3600
@@ -142,6 +140,47 @@ def test_w2_session_expire_apres_une_longue_inactivite(web_lea, monkeypatch):
     monkeypatch.setattr(time, "monotonic", lambda: base_mono)
     r = web_lea.get("/catalogue")
     assert r.status_code == 302 and r.location.endswith("/connexion")
+
+
+class _Horloge:
+    def __init__(self):
+        self.t = time.monotonic()
+
+    def __call__(self):
+        return self.t
+
+
+def test_w2_inactivite_message_neutre_et_registre_vide(web_db, monkeypatch):
+    horloge = _Horloge()
+    monkeypatch.setattr(time, "monotonic", horloge)
+    app = create_app(web_db, secret_key="test", testing=True, inactivite_s=60, duree_max_s=600)
+    c = client_connecte(app, "lea")
+    horloge.t += 50
+    assert c.get("/catalogue").status_code == 200   # l'activite repousse l'echeance
+    horloge.t += 50
+    assert c.get("/catalogue").status_code == 200
+    horloge.t += 61
+    r = c.get("/catalogue")
+    assert r.status_code == 302 and r.location.endswith("/connexion")
+    assert "Session expirée, reconnectez-vous" in c.get("/connexion").get_data(as_text=True)
+    assert variable_interne(app, "sessions_actives") == {}
+    assert c.get("/catalogue").status_code == 302
+
+
+def test_w2_duree_maximale_meme_avec_activite(web_db, monkeypatch):
+    horloge = _Horloge()
+    monkeypatch.setattr(time, "monotonic", horloge)
+    app = create_app(web_db, secret_key="test", testing=True, inactivite_s=60, duree_max_s=150)
+    c = client_connecte(app, "lea")
+    for _ in range(3):
+        horloge.t += 45
+        assert c.get("/catalogue").status_code == 200
+    horloge.t += 45   # 180 s depuis la connexion, jamais 60 s d'inactivite
+    assert c.get("/catalogue").status_code == 302
+
+
+def test_w2_valeurs_par_defaut():
+    assert module_app.INACTIVITE_S == 30 * 60 and module_app.DUREE_MAX_S == 12 * 3600
 
 
 @pytest.mark.xfail(strict=True, reason="faille W3 : sessions_actives n'est jamais purge ; "
