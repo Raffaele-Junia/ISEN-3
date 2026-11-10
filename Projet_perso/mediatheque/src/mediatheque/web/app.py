@@ -548,7 +548,7 @@ def create_app(db, secret_key=None, testing=False, *,
         ids = [d.id for d, _ in catalogue_complet]
         return render_template(
             "admin_gestion.html", onglet=onglet, documents=catalogue_complet,
-            adherents=adherents,
+            adherents=adherents, genres=g.s.genres(),
             prochain_doc=_prochain("D", ids),
             prochain_adh=_prochain("A", [a.numero for a, _ in adherents]))
 
@@ -557,8 +557,10 @@ def create_app(db, secret_key=None, testing=False, *,
     @action
     def admin_ajouter_document():
         f = request.form
-        d = g.s.ajouter_document(f["type"], f["id"].strip(), f["titre"].strip(),
-                                 f["annee"].strip(), f["extra"].strip())
+        d = g.s.ajouter_document(
+            f["type"], f["id"].strip(), f["titre"].strip(), f["annee"].strip(), f["extra"].strip(),
+            genre=f.get("genre", "").strip(), resume=f.get("resume", "").strip(),
+            themes=[t for t in f.get("themes", "").split(",")])
         flash(f"« {d.titre} » ajouté au catalogue.", "ok")
         return redirect(url_for("gestion"))
 
