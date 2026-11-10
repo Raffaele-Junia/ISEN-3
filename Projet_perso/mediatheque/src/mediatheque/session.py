@@ -16,7 +16,8 @@ from functools import wraps
 from .adherents import Adherent
 from .auth import ADHERENT, RESPONSABLE
 from .documents import Document
-from .exceptions import AccesRefuseError, MediathequeError
+from . import recommandations
+from .exceptions import AccesRefuseError, DocumentInconnuError, MediathequeError
 from .rapports import retards, top_emprunteurs
 
 
@@ -95,26 +96,83 @@ class Session:
         self._m.adherent(numero)
         return numero
 
+    def _statut(self, id_document):
+        if self._m.disponible(id_document, self.compte.numero_adherent):
+            return "disponible"
+        if self._m._emprunt_en_cours(id_document):
+            return "emprunte"
+        return "reserve"
+
     # ---------------------------------------------------------------- communs
     @connexion_requise
-    def catalogue(self, texte="", type_doc=None):
-        """Liste de (document, statut) filtree par texte et type."""
+    def catalogue(self, texte="", type_doc=None, genre=None):
+        """Liste de (document, statut) filtree par texte, type et genre.
+        Le texte cherche dans l'identifiant, le titre, le detail, le genre et les themes."""
         texte = texte.strip().lower()
-        numero = self.compte.numero_adherent
         resultat = []
         for d in sorted(self._m):
             if type_doc and d.CLE != type_doc:
                 continue
-            if texte and texte not in f"{d.id} {d.titre} {d.detail}".lower():
+            if genre and d.genre != genre:
                 continue
-            if self._m.disponible(d.id, numero):
-                statut = "disponible"
-            elif self._m._emprunt_en_cours(d.id):
-                statut = "emprunte"
-            else:
-                statut = "reserve"
-            resultat.append((copy(d), statut))
+            if texte and texte not in " ".join(
+                    (d.id, d.titre, str(d.detail), d.genre, *d.themes)).lower():
+                continue
+            resultat.append((copy(d), self._statut(d.id)))
         return resultat
+
+    @connexion_requise
+    def genres(self):
+        """Genres presents dans le fonds, avec leur nombre de documents."""
+        compteur = {}
+        for d in self._m:
+            if d.genre:
+                compteur[d.genre] = compteur.get(d.genre, 0) + 1
+        return sorted(compteur.items())
+
+    @connexion_requise
+    def fiche(self, id_document):
+        """Tout ce qu'il faut pour la page d'un document.
+
+        Le lecteur voit la date de retour prevue d'un document sorti, jamais
+        QUI l'a emprunte. Le responsable voit en plus l'historique des prets."""
+        if id_document not in self._m:
+            raise DocumentInconnuError(id_document)
+        d = self._m[id_document]
+        en_cours = self._m._emprunt_en_cours(id_document)
+        fiche = {
+            "document": copy(d),
+            "statut": self._statut(id_document),
+            "attente": len(self._m.file_attente(id_document)),
+            "retour_prevu": en_cours.date_limite(d.duree_pret_jour) if en_cours else None,
+            "nb_prets": sum(1 for e in self._m.emprunts if e.id_document == id_document),
+            "meme_createur": [(copy(x), self._statut(x.id)) for x in sorted(self._m)
+                              if d.createur and x.createur == d.createur and x.id != d.id][:6],
+            "historique": None,
+        }
+        if self.est_responsable:
+            fiche["historique"] = [
+                {"numero": e.numero_adherent, "nom": self._m.adherent(e.numero_adherent).nom_complet,
+                 "date_emprunt": e.date_emprunt, "date_retour": e.date_retour}
+                for e in reversed(self._m.emprunts) if e.id_document == id_document][:15]
+        return fiche
+
+    @connexion_requise
+    def similaires(self, id_document, n=6):
+        """Documents dans la meme veine : liste de (document, statut)."""
+        if id_document not in self._m:
+            raise DocumentInconnuError(id_document)
+        exclure = {x.id for x, _ in self.fiche(id_document)["meme_createur"]}
+        return [(copy(x), self._statut(x.id))
+                for x in recommandations.similaires(self._m, id_document, n, exclure)]
+
+    @connexion_requise
+    def pour_moi(self, numero=None, n=8):
+        """Suggestions personnelles : liste de dicts {document, statut, raison}.
+        Un adherent ne peut obtenir que les siennes."""
+        numero = self._numero_cible(numero)
+        return [{"document": copy(d), "statut": self._statut(d.id), "raison": raison}
+                for d, raison in recommandations.pour_adherent(self._m, numero, n)]
 
     @connexion_requise
     def file_attente(self, id_document):
@@ -168,12 +226,14 @@ class Session:
 
     # ------------------------------------------------------------ responsable
     @responsable_requis
-    def ajouter_document(self, type_doc, id_document, titre, annee, extra):
+    def ajouter_document(self, type_doc, id_document, titre, annee, extra, **fiche):
+        """`fiche` : genre, themes, resume, editeur, pages, isbn, public (optionnels)."""
         if not isinstance(id_document, str) or not _FORMAT_ID_DOCUMENT.fullmatch(id_document):
             raise MediathequeError(
                 f"identifiant de document invalide : {id_document!r} (attendu : D suivi de chiffres)")
         document = Document.from_csv_row({"id": id_document, "type": type_doc,
                                           "titre": titre, "annee": annee, "extra": extra})
+        document.completer_fiche(**fiche)
         self._m.ajouter_document(document)
         return document
 
