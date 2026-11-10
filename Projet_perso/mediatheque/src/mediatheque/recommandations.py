@@ -90,9 +90,12 @@ def pour_adherent(m, numero, n=8, aujourdhui=None):
     deja_vus = set(historique) | {r.id_document for r in m.reservations
                                   if r.numero_adherent == numero}
 
-    if not historique:
+    def repli():
         return [(d, "Très demandé en ce moment")
                 for d in populaires(m, n, aujourdhui=aujourdhui, exclure=deja_vus)]
+
+    if not historique:
+        return repli()
 
     co = co_emprunts(m)
     scores, raisons = defaultdict(float), {}
@@ -115,4 +118,5 @@ def pour_adherent(m, numero, n=8, aujourdhui=None):
         vu = raisons[i][1]
         verbe = "vu" if vu.CLE == "dvd" else "lu"
         resultat.append((m[i], f"Parce que vous avez {verbe} « {vu.titre} »"))
-    return resultat
+    # fonds sans fiches (genres, themes) : rien de ressemblant, on propose les plus demandes
+    return resultat or repli()

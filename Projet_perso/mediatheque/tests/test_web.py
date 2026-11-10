@@ -196,3 +196,34 @@ def test_ajout_adherent_avec_compte(admin, app):
 def test_suppression_document_avec_historique_refusee(admin, app):
     post(admin, "/admin/documents/D001/supprimer", page="/admin/gestion")
     assert "D001" in app.extensions["mediatheque"]
+
+
+# ------------------------------------------------------- fiche et reco
+def test_fiche_document(lea, admin):
+    page = lea.get("/document/D001").get_data(as_text=True)
+    assert "Fluent Python" in page and "Luciano Ramalho" in page
+    assert "Historique des prêts" not in page            # reserve au personnel
+    assert "Historique des prêts" in admin.get("/document/D001").get_data(as_text=True)
+
+
+@pytest.mark.parametrize("url", ["/document/D999", "/document/abc", "/document/D1%27%3B"])
+def test_fiche_introuvable(lea, url):
+    assert lea.get(url).status_code == 404
+
+
+def test_fiche_exige_une_connexion(app):
+    r = app.test_client().get("/document/D001")
+    assert r.status_code == 302 and r.location.endswith("/connexion")
+
+
+def test_catalogue_relie_les_fiches(lea):
+    assert 'href="/document/D002"' in lea.get("/catalogue").get_data(as_text=True)
+
+
+def test_catalogue_genre_inconnu_ignore(lea):
+    assert lea.get("/catalogue?genre=%3Cscript%3E").status_code == 200
+
+
+def test_compte_affiche_les_suggestions(lea):
+    page = lea.get("/compte").get_data(as_text=True)
+    assert "Pour vous" in page

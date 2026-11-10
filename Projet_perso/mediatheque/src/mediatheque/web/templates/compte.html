@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% import "_etagere.html" as et with context %}
 {% block titre %}Ma carte{% endblock %}
 {% block contenu %}
 {% set a = c.adherent %}
@@ -83,6 +84,8 @@
     <p class="vide">Aucune réservation active. Quand un titre est sorti, le bouton « Réserver » vous place dans la file.</p>
   {% endfor %}
 </section>
+
+{{ et.rangee(pour_vous, "Pour vous", "Des idées choisies d'après ce que vous avez déjà emprunté.", id="h-pour-vous") }}
 
 <section class="carte pad" id="mot-de-passe" aria-labelledby="h-mdp">
   <h2 id="h-mdp">Changer mon mot de passe</h2>

@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% import "_etagere.html" as et with context %}
 {% block titre %}Les rayonnages{% endblock %}
 {% block contenu %}
 <div class="titre-page">
@@ -12,59 +13,33 @@
 <form class="filtres" method="get" action="{{ url_for('catalogue') }}" role="search">
   <div class="recherche">
     <label for="q" class="sr">Rechercher dans le catalogue</label>
-    <input id="q" name="q" type="search" placeholder="Un titre, un auteur, une cote…" value="{{ texte }}" maxlength="100">
+    <input id="q" name="q" type="search" placeholder="Un titre, un auteur, un thème…" value="{{ texte }}" maxlength="100">
     {% if type_doc %}<input type="hidden" name="type" value="{{ type_doc }}">{% endif %}
+    {% if genre %}<input type="hidden" name="genre" value="{{ genre }}">{% endif %}
     <button class="btn" type="submit">Chercher</button>
   </div>
   <nav class="intercalaires" aria-label="Type de document">
-    <a href="{{ url_for('catalogue', q=texte or None) }}" {% if not type_doc %}aria-current="true"{% endif %}>Tout</a>
+    <a href="{{ url_for('catalogue', q=texte or None) }}" {% if not type_doc and not genre %}aria-current="true"{% endif %}>Tout</a>
     <a href="{{ url_for('catalogue', q=texte or None, type='livre') }}" {% if type_doc == 'livre' %}aria-current="true"{% endif %}>Livres</a>
     <a href="{{ url_for('catalogue', q=texte or None, type='dvd') }}" {% if type_doc == 'dvd' %}aria-current="true"{% endif %}>Films</a>
     <a href="{{ url_for('catalogue', q=texte or None, type='revue') }}" {% if type_doc == 'revue' %}aria-current="true"{% endif %}>Presse</a>
   </nav>
 </form>
 
-{% if texte or type_doc %}<p class="compte-resultats">{{ lignes|length }} résultat{{ 's' if lignes|length > 1 }}{% if texte %} pour « {{ texte }} »{% endif %}</p>{% endif %}
+{% if genres %}
+<nav class="genres" aria-label="Genres">
+  {% for nom, nb in genres %}
+    <a href="{{ url_for('catalogue', genre=nom, q=texte or None) }}" {% if genre == nom %}aria-current="true"{% endif %}>{{ nom }} <span>{{ nb }}</span></a>
+  {% endfor %}
+  {% if genre %}<a class="effacer" href="{{ url_for('catalogue', q=texte or None, type=type_doc) }}">× tous les genres</a>{% endif %}
+</nav>
+{% endif %}
+
+{% if texte or type_doc or genre %}<p class="compte-resultats">{{ lignes|length }} résultat{{ 's' if lignes|length > 1 }}{% if texte %} pour « {{ texte }} »{% endif %}{% if genre %} · {{ genre }}{% endif %}</p>{% endif %}
 
 {% if lignes %}
 <div class="etagere">
-  {% for l in lignes %}{% set d = l.doc %}
-  <article class="livre" aria-labelledby="titre-{{ d.id }}">
-    <div class="couverture {{ d.CLE }} t{{ teinte(d) }}">
-      {% if d.CLE == 'revue' %}
-        <span class="c-type">Presse · {{ d.annee }}</span>
-        <span class="c-titre" id="titre-{{ d.id }}">{{ d.titre }}</span>
-        <span class="c-num">n°&#8239;{{ d.numero }}</span>
-      {% else %}
-        <span class="c-type">{{ 'Film' if d.CLE == 'dvd' else 'Livre' }} · {{ d.annee }}</span>
-        <div>
-          <span class="c-titre" id="titre-{{ d.id }}">{{ d.titre }}</span>
-          <div class="c-filet"></div>
-          <span class="c-auteur">{{ d.detail }}</span>
-        </div>
-      {% endif %}
-      <span class="etiquette">{{ cote(d) }}</span>
-      {% if l.statut != 'disponible' %}<span class="tampon {{ l.statut }}">{{ {'emprunte': 'Sorti', 'reserve': 'Réservé'}[l.statut] }}</span>{% endif %}
-    </div>
-    <div class="livre-pied">
-      <span class="info">
-        {% if l.statut == 'disponible' %}En rayon, venez le chercher
-        {% elif l.attente == 0 %}Personne ne l'attend encore
-        {% elif l.attente == 1 %}Une personne l'attend
-        {% else %}{{ l.attente }} personnes l'attendent{% endif %}
-      </span>
-      {% if not s.est_responsable and l.statut != 'disponible' %}
-        {% if l.a_moi %}
-          <span class="btn petit fait">{{ l.a_moi }}</span>
-        {% else %}
-          <form method="post" action="{{ url_for('reserver', id_document=d.id) }}">{{ jeton() }}
-            <button class="btn second petit" type="submit" aria-label="Réserver {{ d.titre }}">Réserver</button>
-          </form>
-        {% endif %}
-      {% endif %}
-    </div>
-  </article>
-  {% endfor %}
+  {% for l in lignes %}{{ et.livre(l) }}{% endfor %}
 </div>
 {% else %}
 <div class="carte"><p class="vide">Rien sur nos étagères pour cette recherche. Essayez un autre mot, ou <a href="{{ url_for('catalogue') }}">parcourez tout le fonds</a>.</p></div>

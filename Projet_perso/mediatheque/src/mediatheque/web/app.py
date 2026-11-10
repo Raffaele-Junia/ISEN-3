@@ -14,6 +14,7 @@ Regles de securite de la couche web :
 import csv
 import io
 import os
+import re
 import secrets
 import threading
 import time
@@ -66,6 +67,18 @@ def cote(doc):
 def teinte(doc):
     """Couleur de couverture stable pour un document (0..TEINTES-1)."""
     return sum(map(ord, doc.id + doc.titre)) % TEINTES
+
+
+DOSSIER_COUVERTURES = Path(__file__).resolve().parent / "static" / "couvertures"
+
+
+def couverture(doc):
+    """Chemin static/ de la vraie couverture si elle a ete telechargee, sinon None
+    (le gabarit dessine alors la couverture typographique)."""
+    nom = f"{doc.id}.jpg"
+    if re.fullmatch(r"D\d{1,6}\.jpg", nom) and (DOSSIER_COUVERTURES / nom).is_file():
+        return f"couvertures/{nom}"
+    return None
 
 
 def date_courte(d):
@@ -305,6 +318,7 @@ def create_app(db, secret_key=None, testing=False, *,
 
         return {"csrf": csrf, "jeton": jeton, "icone_logo": ICONE_LOGO, "s": s,
                 "nom_mediatheque": NOM_MEDIATHEQUE, "cote": cote, "teinte": teinte,
+                "couverture": couverture,
                 "aujourdhui": date.today(), "TYPES": TYPES, "LIBELLE_EXTRA": LIBELLE_EXTRA}
 
     @app.template_filter("fr")
@@ -375,18 +389,45 @@ def create_app(db, secret_key=None, testing=False, *,
         type_doc = request.args.get("type") or None
         if type_doc not in (None, *dict(TYPES)):
             type_doc = None
+        genres = g.s.genres()
+        genre = request.args.get("genre") or None
+        if genre not in {nom for nom, _ in genres}:
+            genre = None
         tous = g.s.catalogue()
-        resultats = g.s.catalogue(texte, type_doc)
-        a_moi = {}
-        if not g.s.est_responsable:
-            compte = g.s.mon_compte()
-            a_moi = {r["document"].id: "Réservé ✓" for r in compte["reservations"]}
-            a_moi |= {e["document"].id: "Chez vous" for e in compte["emprunts"]}
-        lignes = [{"doc": d, "statut": st, "attente": g.s.file_attente(d.id),
-                   "a_moi": a_moi.get(d.id)} for d, st in resultats]
+        resultats = g.s.catalogue(texte, type_doc, genre)
         return render_template(
-            "catalogue.html", lignes=lignes, texte=texte, type_doc=type_doc,
+            "catalogue.html", lignes=lignes_etagere(resultats), texte=texte, type_doc=type_doc,
+            genre=genre, genres=genres,
             total=len(tous), dispo=sum(1 for _, st in tous if st == "disponible"))
+
+    def mes_documents():
+        """{id: libelle} des documents que le lecteur a chez lui ou a reserves."""
+        if g.s.est_responsable:
+            return {}
+        compte = g.s.mon_compte()
+        a_moi = {r["document"].id: "Réservé ✓" for r in compte["reservations"]}
+        a_moi |= {e["document"].id: "Chez vous" for e in compte["emprunts"]}
+        return a_moi
+
+    def lignes_etagere(documents_statuts, raisons=None):
+        a_moi = mes_documents()
+        return [{"doc": d, "statut": st, "attente": g.s.file_attente(d.id),
+                 "a_moi": a_moi.get(d.id), "raison": (raisons or {}).get(d.id)}
+                for d, st in documents_statuts]
+
+    @app.get("/document/<id_document>")
+    @connexion_requise
+    def document(id_document):
+        if not re.fullmatch(r"D\d{1,6}", id_document):
+            abort(404)
+        try:
+            f = g.s.fiche(id_document)
+        except MediathequeError:
+            abort(404)
+        return render_template(
+            "document.html", f=f, d=f["document"], a_moi=mes_documents().get(id_document),
+            meme_createur=lignes_etagere(f["meme_createur"]),
+            similaires=lignes_etagere(g.s.similaires(id_document)))
 
     @app.post("/reserver/<id_document>")
     @connexion_requise
@@ -409,7 +450,10 @@ def create_app(db, secret_key=None, testing=False, *,
     def compte():
         if g.s.est_responsable:
             return redirect(url_for("tableau_de_bord"))
-        return render_template("compte.html", c=g.s.mon_compte())
+        suggestions = g.s.pour_moi(n=6)
+        pour_vous = lignes_etagere([(x["document"], x["statut"]) for x in suggestions],
+                                   {x["document"].id: x["raison"] for x in suggestions})
+        return render_template("compte.html", c=g.s.mon_compte(), pour_vous=pour_vous)
 
     @app.post("/compte/mot-de-passe")
     @connexion_requise(sous_verrou=False)

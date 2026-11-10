@@ -1,0 +1,62 @@
+{# Couverture d'un document : vraie image si telechargee, sinon couverture typographique. #}
+{% macro couv(d, statut=None, grande=False) %}
+{% set img = couverture(d) %}
+<div class="couverture {{ d.CLE }} t{{ teinte(d) }}{{ ' photo' if img }}{{ ' grande' if grande }}">
+  {% if img %}
+    <img src="{{ url_for('static', filename=img) }}" alt="Couverture de {{ d.titre }}" loading="lazy" width="300" height="420">
+  {% elif d.CLE == 'revue' %}
+    <span class="c-type">Presse · {{ d.annee }}</span>
+    <span class="c-titre">{{ d.titre }}</span>
+    <span class="c-num">n°&#8239;{{ d.numero }}</span>
+  {% else %}
+    <span class="c-type">{{ 'Film' if d.CLE == 'dvd' else 'Livre' }} · {{ d.annee }}</span>
+    <div>
+      <span class="c-titre">{{ d.titre }}</span>
+      <div class="c-filet"></div>
+      <span class="c-auteur">{{ d.detail }}</span>
+    </div>
+  {% endif %}
+  <span class="etiquette">{{ cote(d) }}</span>
+  {% if statut and statut != 'disponible' %}<span class="tampon {{ statut }}">{{ {'emprunte': 'Sorti', 'reserve': 'Réservé'}[statut] }}</span>{% endif %}
+</div>
+{% endmacro %}
+
+{# Un document sur l'etagere : couverture cliquable vers sa fiche, puis l'action. #}
+{% macro livre(l) %}
+{% set d = l.doc %}
+<article class="livre" aria-labelledby="titre-{{ d.id }}">
+  <a class="lien-fiche" href="{{ url_for('document', id_document=d.id) }}">
+    {{ couv(d, l.statut) }}
+    <span class="sous-titre" id="titre-{{ d.id }}">{{ d.titre }}</span>
+  </a>
+  <div class="livre-pied">
+    {% if l.raison %}<span class="raison">{{ l.raison }}</span>{% endif %}
+    <span class="info">
+      {% if l.statut == 'disponible' %}En rayon, venez le chercher
+      {% elif l.attente == 0 %}Personne ne l'attend encore
+      {% elif l.attente == 1 %}Une personne l'attend
+      {% else %}{{ l.attente }} personnes l'attendent{% endif %}
+    </span>
+    {% if not s.est_responsable and l.statut != 'disponible' %}
+      {% if l.a_moi %}
+        <span class="btn petit fait">{{ l.a_moi }}</span>
+      {% else %}
+        <form method="post" action="{{ url_for('reserver', id_document=d.id) }}">{{ jeton() }}
+          <button class="btn second petit" type="submit" aria-label="Réserver {{ d.titre }}">Réserver</button>
+        </form>
+      {% endif %}
+    {% endif %}
+  </div>
+</article>
+{% endmacro %}
+
+{% macro rangee(lignes, titre, chapo=None, id=None) %}
+{% if lignes %}
+<section class="rangee-etagere" aria-labelledby="{{ id }}">
+  <div class="rangee-titre"><h2 id="{{ id }}">{{ titre }}</h2>{% if chapo %}<p class="muted">{{ chapo }}</p>{% endif %}</div>
+  <div class="etagere defilante">
+    {% for l in lignes %}{{ livre(l) }}{% endfor %}
+  </div>
+</section>
+{% endif %}
+{% endmacro %}
