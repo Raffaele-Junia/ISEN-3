@@ -89,6 +89,10 @@ class GestionComptes:
         self.ajouter(compte)
         return compte
 
+    def get(self, identifiant):
+        """Compte actuellement enregistre pour cet identifiant (ou None)."""
+        return self._comptes.get(identifiant)
+
     def supprimer(self, identifiant):
         self._comptes.pop(identifiant, None)
 

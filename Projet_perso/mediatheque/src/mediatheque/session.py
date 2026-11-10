@@ -19,9 +19,12 @@ from .exceptions import AccesRefuseError, MediathequeError
 from .rapports import retards, top_emprunteurs
 
 
+_JETON = object()  # seul ouvrir_session peut construire une Session (S4)
+
+
 def ouvrir_session(mediatheque, identifiant, mot_de_passe):
     compte = mediatheque.comptes.authentifier(identifiant, mot_de_passe)
-    return Session(mediatheque, compte)
+    return Session(mediatheque, compte, _jeton=_JETON)
 
 
 def responsable_requis(methode):
@@ -44,7 +47,9 @@ def connexion_requise(methode):
 
 class Session:
 
-    def __init__(self, mediatheque, compte):
+    def __init__(self, mediatheque, compte, *, _jeton=None):
+        if _jeton is not _JETON:
+            raise AccesRefuseError("une session s'ouvre uniquement par ouvrir_session()")
         self._m = mediatheque
         self._compte = compte
         self._ouverte = True
@@ -65,6 +70,11 @@ class Session:
     def _verifier_ouverte(self):
         if not self._ouverte:
             raise AccesRefuseError("session fermee : reconnectez-vous")
+        # Revocation : compte supprime, ou remplace (role, numero, mot de passe
+        # reinitialise...) depuis l'ouverture de la session.
+        if self._m.comptes.get(self._compte.identifiant) is not self._compte:
+            self._ouverte = False
+            raise AccesRefuseError("session revoquee : reconnectez-vous")
 
     def _jour(self, jour):
         """Seul le responsable peut antidater ou postdater une operation (S1)."""
@@ -182,7 +192,9 @@ class Session:
 
     @responsable_requis
     def reinitialiser_mot_de_passe(self, identifiant, nouveau):
-        self._m.comptes.reinitialiser_mot_de_passe(identifiant, nouveau)
+        compte = self._m.comptes.reinitialiser_mot_de_passe(identifiant, nouveau)
+        if compte.identifiant == self._compte.identifiant:
+            self._compte = compte  # sa propre session reste valide
 
     @responsable_requis
     def enregistrer_emprunt(self, id_document, numero, jour=None):

@@ -167,17 +167,32 @@ def test_s2_changement_de_mot_de_passe_remplace_le_compte(mc, lea):
 
 
 # ------------------------- S4 : Session falsifiable et non revocable
-@pytest.mark.xfail(strict=True, reason="faille S4 : Session(m, Compte(...)) se construit "
-                   "sans authentification, avec un compte inexistant")
 def test_s4_session_forgee_refusee(mc):
     faux = Compte("pirate", b"x" * 32, b"y" * 16, RESPONSABLE)
     with pytest.raises((AccesRefuseError, TypeError, ValueError)):
         Session(mc, faux).adherents()
 
 
-@pytest.mark.xfail(strict=True, reason="faille S4 : une session reste valide apres "
-                   "suppression du compte (pas de revocation)")
 def test_s4_session_revoquee_apres_suppression_du_compte(mc, lea):
     mc.comptes.supprimer("lea")
     with pytest.raises(AccesRefuseError):
         lea.mon_compte()
+
+
+def test_s4_session_forgee_avec_un_vrai_compte_refusee(mc):
+    vrai = mc.comptes.get("admin")
+    with pytest.raises(AccesRefuseError):
+        Session(mc, vrai)
+
+
+def test_s4_session_revoquee_apres_reinitialisation_du_mot_de_passe(admin, lea):
+    admin.reinitialiser_mot_de_passe("lea", "Neuf12345")
+    with pytest.raises(AccesRefuseError):
+        lea.catalogue()
+    admin.reinitialiser_mot_de_passe("admin", "Neuf12345")
+    assert admin.adherents()  # sa propre session reste ouverte
+
+
+def test_s4_session_conservee_apres_son_propre_changement_de_mot_de_passe(lea):
+    lea.changer_mot_de_passe(MDP, "Nouveau456")
+    assert lea.mon_compte()["adherent"].numero == "A001"
