@@ -33,7 +33,7 @@ Plan détaillé et priorités : `docs/RAPPORT_SITUATION.md`. **Mettre à jour la
 | `exceptions.py` | `MediathequeError`, dont héritent `DocumentInconnuError`, `AdherentInconnuError`, `DocumentIndisponibleError` et `QuotaDepasseError`. |
 | `main.py` | Scénario de démo en console, sur une **copie temporaire** de `data/`. |
 | `web/app.py` | `create_app(db)` crée l'application Flask. Les sessions sont gardées **côté serveur** (`sessions_actives` : jeton → `Session`) ; le cookie ne contient qu'un jeton signé. Un jeton CSRF est exigé sur tout POST (`{{ jeton() }}` dans les formulaires). En-têtes : CSP `script-src 'none'` (aucun JavaScript sur le site), X-Frame-Options et nosniff. Décorateurs `connexion_requise`, `responsable_requis` (403 sinon) et `action` (verrou, sauvegarde en base après chaque POST, erreur métier transformée en message). Routes : `/connexion`, `/catalogue`, `/reserver/<id>`, `/annuler/<id>`, `/compte`, `/admin` (tableau de bord et guichet), `/admin/gestion`, `/admin/retards.csv`. |
-| `web/templates/`, `web/static/style.css` | Templates Jinja (échappement automatique) et CSS fidèle aux maquettes : polices Inter et Space Grotesk, accent `#2F4FD8`, responsive. |
+| `web/templates/`, `web/static/style.css` | Templates Jinja (échappement automatique) et CSS. **Identité « Médiathèque des Tilleuls »** (nom modifiable avec `MEDIATHEQUE_NOM`), qui remplace le premier style des maquettes. Papier crème `#F3EDE2`, vert reliure `#1E4A38`, moutarde `#D9A21B`. Polices : Fraunces pour les titres, Instrument Sans pour le texte, Courier Prime pour les cotes et étiquettes. Catalogue en étagère de couvertures colorées (`teinte(doc)`, 8 couleurs), cote façon étiquette de dos (`cote(doc)` : `LIV HUG`), statuts en `.tampon`, fiche de prêt cartonnée. Filtres de date `court` et `long`. Textes chaleureux, sans emoji. Ne jamais animer l'opacité depuis 0. |
 
 ## Données (`data/*.csv`)
 - `documents.csv` : `id,type,titre,annee,extra`
@@ -60,7 +60,8 @@ Plan détaillé et priorités : `docs/RAPPORT_SITUATION.md`. **Mettre à jour la
 - [x] P2 : site web Flask d'après les maquettes Claude Design, vérifié dans le navigateur sur ordinateur et sur mobile. 181 tests au total.
 - [x] Jeu de démo `data_demo/` : 136 documents et 45 adhérents, généré par `scripts/generer_donnees.py` (simulation déterministe de 5 mois d'activité). `data/` reste le petit jeu utilisé par les tests.
 - [x] P2 bis : audit du site web, `docs/securite/AUDIT_2026-11-10_web.md`. Il trouve les failles W1–W7 (3 moyennes, 4 basses), **pas encore corrigées** et prouvées par des tests xfail dans `tests/security/test_securite_web*.py`.
-- [ ] Corriger W1–W7 (agent `security-fixer`), puis refonte visuelle pour un rendu moins « IA » (plugin frontend-design proposé).
+- [x] Refonte visuelle « Médiathèque des Tilleuls » (rendu moins « IA »).
+- [ ] Corriger W1–W7 (agent `security-fixer`).
 - [ ] P3 : README, journalisation, audit final
 
 ## Règles de travail
