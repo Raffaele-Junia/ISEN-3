@@ -35,6 +35,15 @@ def top_emprunteurs(m, n=3):
     return compteur.most_common(n)
 
 
+_DEBUTS_DANGEREUX = ("=", "+", "-", "@", "\t", "\r")
+
+
+def _neutraliser(valeur):
+    """Empeche un tableur d'interpreter la cellule comme une formule."""
+    texte = str(valeur)
+    return "'" + texte if texte.startswith(_DEBUTS_DANGEREUX) else texte
+
+
 def export_retards_csv(chemin, retards):
     nb = 0
     with open(chemin, "w", encoding="utf-8", newline="") as f:
@@ -43,9 +52,9 @@ def export_retards_csv(chemin, retards):
         writer.writeheader()
         for emprunt, document, jours in retards:
             writer.writerow({
-                "id_document": emprunt.id_document,
-                "numero_adherent": emprunt.numero_adherent,
-                "jours_retard": jours,
+                "id_document": _neutraliser(emprunt.id_document),
+                "numero_adherent": _neutraliser(emprunt.numero_adherent),
+                "jours_retard": _neutraliser(jours),
             })
             nb += 1
     return nb

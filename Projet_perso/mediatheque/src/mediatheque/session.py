@@ -8,6 +8,7 @@ metier. Masquer un bouton dans l'interface ne suffit jamais.
 Les objets renvoyes (documents, adherent) sont des COPIES : les modifier n'a
 aucun effet sur l'etat metier. Le compte de la session est immuable.
 """
+import re
 from copy import copy
 from datetime import date
 from functools import wraps
@@ -19,6 +20,7 @@ from .exceptions import AccesRefuseError, MediathequeError
 from .rapports import retards, top_emprunteurs
 
 
+_FORMAT_ID_DOCUMENT = re.compile(r"D\d+")
 _JETON = object()  # seul ouvrir_session peut construire une Session (S4)
 
 
@@ -167,6 +169,9 @@ class Session:
     # ------------------------------------------------------------ responsable
     @responsable_requis
     def ajouter_document(self, type_doc, id_document, titre, annee, extra):
+        if not isinstance(id_document, str) or not _FORMAT_ID_DOCUMENT.fullmatch(id_document):
+            raise MediathequeError(
+                f"identifiant de document invalide : {id_document!r} (attendu : D suivi de chiffres)")
         document = Document.from_csv_row({"id": id_document, "type": type_doc,
                                           "titre": titre, "annee": annee, "extra": extra})
         self._m.ajouter_document(document)
