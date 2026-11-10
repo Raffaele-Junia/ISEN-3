@@ -20,6 +20,10 @@ class DocumentIndisponibleError(MediathequeError):
         super().__init__(f"document deja emprunte : {titre}")
 
 
+class ReservationImpossibleError(MediathequeError):
+    """Reservation refusee (document disponible, doublon, limite atteinte...)."""
+
+
 class QuotaDepasseError(MediathequeError):
     def __init__(self, nb_actuel, quota):
         self.nb_actuel = nb_actuel

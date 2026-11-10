@@ -2,6 +2,7 @@ import csv
 from .documents import Document
 from .adherents import Adherent
 from .emprunt import Emprunt
+from .reservation import Reservation
 
 def lire_documents(chemin):
     with open(chemin, encoding="utf-8", newline="") as f:
@@ -41,3 +42,18 @@ def ecrire_emprunts(chemin,emprunts):
             writer.writeheader()
             for emprunt in emprunts:
                 writer.writerow(emprunt.to_csv_row())
+
+def lire_reservations(chemin):
+    if not chemin.exists():  # fichier optionnel (anciennes donnees)
+        return
+    with open(chemin, encoding="utf-8", newline="") as f:
+        for ligne in csv.DictReader(f):
+            yield Reservation.from_csv_row(ligne)
+
+def ecrire_reservations(chemin, reservations):
+    with open(chemin, "w", encoding="utf-8", newline="") as f:
+        writer = csv.DictWriter(f, fieldnames=["id_document", "numero_adherent",
+                                               "date_reservation", "statut", "date_disponible"])
+        writer.writeheader()
+        for reservation in reservations:
+            writer.writerow(reservation.to_csv_row())
