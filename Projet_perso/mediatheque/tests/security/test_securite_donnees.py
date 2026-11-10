@@ -101,8 +101,6 @@ def test_init_db_n_ecrase_pas_un_fichier_existant(dossier_data, tmp_path):
 
 
 # ------------------------------- S3 : integrite metier non verifiee au chargement
-@pytest.mark.xfail(strict=True, reason="faille S3 : deux emprunts en cours du meme "
-                   "document acceptes au chargement")
 def test_s3_double_emprunt_en_cours_refuse(db):
     for numero in ("A001", "A002"):
         executer(db, "INSERT INTO emprunts (id_document, numero_adherent, date_emprunt) "
@@ -111,8 +109,6 @@ def test_s3_double_emprunt_en_cours_refuse(db):
         Mediatheque.charger(db)
 
 
-@pytest.mark.xfail(strict=True, reason="faille S3 : quota depasse accepte au chargement")
-def test_s3_quota_depasse_refuse(db):
     for id_document in ("D001", "D002", "D003", "D004"):  # A001 standard : quota 3
         executer(db, "INSERT INTO emprunts (id_document, numero_adherent, date_emprunt) "
                  "VALUES (?, 'A001', '2026-10-01')", (id_document,))
@@ -120,8 +116,6 @@ def test_s3_quota_depasse_refuse(db):
         Mediatheque.charger(db)
 
 
-@pytest.mark.xfail(strict=True, reason="faille S3 : reservation 'disponible' sans "
-                   "date_disponible acceptee, puis TypeError a chaque operation (deni de service)")
 def test_s3_reservation_disponible_sans_date(db):
     executer(db, "INSERT INTO reservations (id_document, numero_adherent, date_reservation, "
              "statut, date_disponible) VALUES ('D001', 'A001', '2026-10-01', 'disponible', NULL)")
@@ -132,10 +126,31 @@ def test_s3_reservation_disponible_sans_date(db):
     m.emprunter("D004", "A002", date(2026, 11, 5))  # leve TypeError aujourd'hui
 
 
-@pytest.mark.xfail(strict=True, reason="faille S3 : date de retour anterieure a "
-                   "l'emprunt acceptee au chargement")
 def test_s3_dates_incoherentes_refusees(db):
     executer(db, "INSERT INTO emprunts (id_document, numero_adherent, date_emprunt, "
              "date_retour) VALUES ('D001', 'A001', '2026-10-01', '2020-01-01')")
     with pytest.raises(ERREURS_CHARGEMENT):
         Mediatheque.charger(db)
+
+
+def test_s3_document_mis_de_cote_pour_deux_adherents_refuse(db):
+    for numero in ("A001", "A002"):
+        executer(db, "INSERT INTO reservations (id_document, numero_adherent, date_reservation, "
+                 "statut, date_disponible) VALUES ('D001', ?, '2026-10-01', 'disponible', "
+                 "'2026-10-02')", (numero,))
+    with pytest.raises(MediathequeError):
+        Mediatheque.charger(db)
+
+
+def test_s3_historique_de_reservations_coherent_recharge(m, tmp_path):
+    """Pas de faux positif : une reservation honoree garde sa date de mise de cote."""
+    m.emprunter("D001", "A001", date(2026, 10, 1))
+    m.reserver("D001", "A002", date(2026, 10, 2))
+    m.retourner("D001", date(2026, 10, 3))
+    m.emprunter("D001", "A002", date(2026, 10, 4))
+    m.reserver("D001", "A001", date(2026, 10, 5))
+    m.retourner("D001", date(2026, 10, 6))
+    m.actualiser_reservations(date(2026, 10, 20))  # A001 n'est pas venu : expiree
+    m.sauvegarder(tmp_path / "m.db")
+    m2 = Mediatheque.charger(tmp_path / "m.db")
+    assert sorted(r.statut for r in m2.reservations) == ["expiree", "honoree"]

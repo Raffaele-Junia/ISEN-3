@@ -1,3 +1,4 @@
+from collections import Counter
 from datetime import date
 from pathlib import Path
 
@@ -105,7 +106,29 @@ class Mediatheque:
             m.ajouter_reservation(reservation)
         for compte in donnees.get("comptes", ()):
             m.ajouter_compte(compte)
+        m._verifier_coherence()
         return m
+
+    def _verifier_coherence(self):
+        """Regles metier sur les donnees chargees (base eventuellement falsifiee) :
+        leve MediathequeError a la premiere incoherence."""
+        en_cours = Counter(e.id_document for e in self._emprunts if e.en_cours)
+        if any(n > 1 for n in en_cours.values()):
+            raise MediathequeError("document emprunte deux fois simultanement")
+        for a in self._adherents.values():
+            if len(self.emprunts_de(a.numero)) > a.quota:
+                raise MediathequeError(f"quota depasse pour {a.numero}")
+        for e in self._emprunts:
+            if e.date_retour is not None and e.date_retour < e.date_emprunt:
+                raise MediathequeError("date de retour anterieure a l'emprunt")
+        for r in self._reservations:
+            # une reservation honoree/expiree/annulee garde sa date de mise de cote
+            if (r.statut == DISPONIBLE and r.date_disponible is None
+                    or r.statut == EN_ATTENTE and r.date_disponible is not None):
+                raise MediathequeError("reservation incoherente : statut et date de mise de cote")
+        mises = Counter(r.id_document for r in self._reservations if r.statut == DISPONIBLE)
+        if any(n > 1 for n in mises.values()):
+            raise MediathequeError("document mis de cote pour deux adherents")
 
     def sauvegarder(self, destination=None):
         destination = Path(destination) if destination is not None else self._source
