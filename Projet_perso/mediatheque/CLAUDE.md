@@ -1,11 +1,15 @@
 # Médiathèque : mémoire du projet
 
 Projet perso (ISEN 3) de Raffaele : système de gestion de médiathèque en Python.
-**Objectif en cours :** une interface graphique avec comptes adhérents, catalogue, réservations à l'avance et un accès admin (responsable).
+**Objectif en cours :** un **site web** (Flask) avec comptes adhérents, catalogue, réservations à l'avance et un accès admin (responsable). Tkinter a été écarté, jugé trop daté.
+Maquettes Claude Design de référence : https://claude.ai/artifact/UkHAJYLgKGwd6b9WyRq2pK (connexion, catalogue, mon compte, tableau de bord, gestion).
 Plan détaillé et priorités : `docs/RAPPORT_SITUATION.md`. **Mettre à jour la section « Avancement » ci-dessous à chaque palier terminé.**
 
 ## Stack
-- Python **3.14**, paquet géré par **uv** (`uv_build`), disposition `src/`. Aucune dépendance d'exécution.
+- Python **3.14**, paquet géré par **uv** (`uv_build`), disposition `src/`. Seule dépendance d'exécution : **Flask**.
+- Lancer le site : `uv run --system-certs python -m mediatheque.web.app --db mediatheque.db` (http://127.0.0.1:5000). Utiliser `python -m`, car les lanceurs `.exe` de uv (`mediatheque-web`, `mediatheque`) se bloquent sur ce poste.
+- Base de démonstration avec comptes de test : `uv run python scripts/creer_demo.py demo.db` (identifiants dans la docstring du script).
+- Le serveur de prévisualisation de Claude est configuré dans `../../.claude/launch.json` (racine du dépôt).
 - Dépendance de dev : `pytest`. Lancer les tests : `uv run --system-certs pytest -q -p no:cacheprovider`. Sur ce réseau, uv a besoin de `--system-certs`, et OneDrive bloque le cache de pytest, d'où `-p no:cacheprovider`.
 - Lancer la démo console : `uv run mediatheque` (elle travaille sur une copie temporaire de `data/`).
 - Créer la base : `uv run mediatheque-init --depuis data --db mediatheque.db --admin admin`. Le mot de passe est demandé au clavier, et les fichiers `*.db` sont ignorés par git.
@@ -20,13 +24,15 @@ Plan détaillé et priorités : `docs/RAPPORT_SITUATION.md`. **Mettre à jour la
 | `mediatheque.py` | Moteur métier `Mediatheque`, **sans contrôle d'accès**. `charger(source)` / `sauvegarder()` acceptent un fichier `.db` (SQLite) ou un dossier CSV. Méthodes : `disponible(id, numero=None)` (un document mis de côté n'est disponible que pour son réservant), `emprunter`, `retourner` (met le document de côté pour le premier de la file), `reserver`, `annuler_reservation`, `actualiser_reservations(jour)` (expirations), `file_attente`, `emprunts_de`, `reservations_de`, `adherent(numero)`, `creer_compte`, `supprimer_document` (refusée s'il existe un historique). Les doublons et les références orphelines sont refusés. L'attribut `comptes` est un `GestionComptes`. |
 | `reservation.py` | `@dataclass Reservation(id_document, numero_adherent, date_reservation, statut, date_disponible)`. Statuts : `en_attente`, `disponible` (mis de côté), `honoree`, `annulee`, `expiree`. Constantes `DELAI_RETRAIT_JOURS=3` et `MAX_RESERVATIONS=3`. |
 | `auth.py` | `Compte(identifiant, hash_mdp, sel, role, numero_adherent)`. Rôles `adherent` et `responsable`. `GestionComptes` : `creer` (scrypt avec sel, politique de mot de passe), `authentifier` (temps constant, message unique, délai progressif 1, 2, 4… s plafonné à 60 s après 5 échecs ; scrypt N=2**17, paramètres encodés dans le hash, anciens hashes re-hachés à la connexion), `changer_mot_de_passe`, `reinitialiser_mot_de_passe`. |
-| `session.py` | **Seule porte d'entrée de l'interface.** `ouvrir_session(m, id, mdp)` renvoie une `Session`. Décorateurs `@connexion_requise` et `@responsable_requis`. Partie adhérent : `catalogue(texte, type_doc)` (liste de couples `(doc, statut)`), `mon_compte()`, `reserver`, `annuler_reservation`, `changer_mot_de_passe`. Partie responsable : `ajouter_document`, `supprimer_document`, `adherents`, `ajouter_adherent`, `creer_compte`, `reinitialiser_mot_de_passe`, `enregistrer_emprunt`, `enregistrer_retour`, `retards`, `statistiques`, `sauvegarder`. Un adhérent n'agit que sur son propre numéro. Un test vérifie que toute méthode publique est bien décorée. |
+| `session.py` | **Seule porte d'entrée de l'interface.** `ouvrir_session(m, id, mdp)` renvoie une `Session`, et il n'y a aucun autre moyen d'en créer une : `Session(m, compte)` lève une erreur (S4). La session est révoquée si son compte change dans le registre. Les objets renvoyés sont des copies, et seul le responsable peut passer `jour` ou `aujourdhui`. Décorateurs `@connexion_requise` et `@responsable_requis`. Partie adhérent : `catalogue(texte, type_doc)` (liste de couples `(doc, statut)`), `mon_compte()`, `reserver`, `annuler_reservation`, `changer_mot_de_passe`. Partie responsable : `ajouter_document`, `supprimer_document`, `adherents`, `ajouter_adherent`, `creer_compte`, `reinitialiser_mot_de_passe`, `enregistrer_emprunt`, `enregistrer_retour`, `retards`, `statistiques`, `sauvegarder`. Un adhérent n'agit que sur son propre numéro. Un test vérifie que toute méthode publique est bien décorée. |
 | `stockage.py` | `lire_*` / `ecrire_*` pour les CSV en UTF-8. `reservations.csv` est optionnel. Les comptes ne sont jamais écrits en CSV. |
 | `stockage_sqlite.py` | Tables `documents`, `adherents`, `emprunts`, `reservations` et `comptes`. Clés étrangères et contraintes CHECK, SQL toujours paramétré, sauvegarde complète dans une seule transaction. |
 | `init_db.py` | Commande `mediatheque-init` : importe les CSV dans une base SQLite et crée le compte responsable. Refuse d'écraser une base existante. |
 | `rapports.py` | Filtres `par_auteur`, `parue_apres`, `du_type` (fermetures). `retards(m, date)` est un générateur de `(emprunt, doc, jours)`. Aussi `top_emprunteurs(m, n)` et `export_retards_csv`. |
 | `exceptions.py` | `MediathequeError`, dont héritent `DocumentInconnuError`, `AdherentInconnuError`, `DocumentIndisponibleError` et `QuotaDepasseError`. |
 | `main.py` | Scénario de démo en console, sur une **copie temporaire** de `data/`. |
+| `web/app.py` | `create_app(db)` crée l'application Flask. Les sessions sont gardées **côté serveur** (`sessions_actives` : jeton → `Session`) ; le cookie ne contient qu'un jeton signé. Un jeton CSRF est exigé sur tout POST (`{{ jeton() }}` dans les formulaires). En-têtes : CSP `script-src 'none'` (aucun JavaScript sur le site), X-Frame-Options et nosniff. Décorateurs `connexion_requise`, `responsable_requis` (403 sinon) et `action` (verrou, sauvegarde en base après chaque POST, erreur métier transformée en message). Routes : `/connexion`, `/catalogue`, `/reserver/<id>`, `/annuler/<id>`, `/compte`, `/admin` (tableau de bord et guichet), `/admin/gestion`, `/admin/retards.csv`. |
+| `web/templates/`, `web/static/style.css` | Templates Jinja (échappement automatique) et CSS fidèle aux maquettes : polices Inter et Space Grotesk, accent `#2F4FD8`, responsive. |
 
 ## Données (`data/*.csv`)
 - `documents.csv` : `id,type,titre,annee,extra`
@@ -39,16 +45,19 @@ Plan détaillé et priorités : `docs/RAPPORT_SITUATION.md`. **Mettre à jour la
 - Réservation : possible seulement si le document est emprunté (ou mis de côté pour quelqu'un d'autre), au maximum 3 actives par adhérent, et jamais sur son propre emprunt. Au retour du document, le premier de la file l'a de côté pendant 3 jours. Ensuite sa réservation expire et le suivant prend la main.
 - Seul le responsable enregistre les emprunts et les retours (au guichet). L'adhérent consulte le catalogue et son compte, et réserve ou annule ses réservations.
 
-## Architecture cible (P2)
-- Interface **Tkinter/ttk** : écran de connexion, puis espace adhérent ou espace responsable.
-- Les vues n'appellent **que** `Session`. Aucune logique métier dans les vues, et jamais d'accès à `session._m`.
+## Architecture web
+- Les vues Flask n'appellent **que** `Session`. Aucune logique métier dans les vues, et jamais d'accès à `session._m`. Seule exception : la sauvegarde `m.sauvegarder()` dans le décorateur `action`.
+- Tout nouveau formulaire POST doit contenir `{{ jeton() }}`. Tout nouvel écran du responsable passe par `@responsable_requis`.
+- Pas de JavaScript : la CSP le bloque. Les interactions passent par des formulaires et des liens.
 
 ## Avancement
 - [x] Système de base (modèle, CSV, rapports, démo console)
 - [x] Rapport de situation et plan, agent `security-tester`, `.gitignore`
 - [x] P0 : bugs B1–B4 corrigés, tests pytest de base
 - [x] P1 : SQLite, comptes et rôles, réservations, `mediatheque-init` (81 tests). Audit de sécurité : voir `docs/securite/` (S1–S7 corrigées).
-- [ ] P2 : interface graphique
+- [x] Agent `security-fixer` : S1–S7 corrigées (un commit par faille).
+- [x] P2 : site web Flask d'après les maquettes Claude Design, vérifié dans le navigateur sur ordinateur et sur mobile. 181 tests au total.
+- [ ] P2 bis : audit `security-tester` du site web (pas encore lancé)
 - [ ] P3 : README, journalisation, audit final
 
 ## Règles de travail
