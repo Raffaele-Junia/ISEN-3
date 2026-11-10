@@ -1,7 +1,7 @@
 [project]
 name = "mediatheque"
 version = "0.1.0"
-description = "Add your description here"
+description = "Gestion de médiathèque : catalogue, emprunts, réservations, comptes adhérents et responsable"
 readme = "README.md"
 authors = [
     { name = "Raffaele FARVACQUE", email = "raffaele.farvacque@student.junia.com" }
@@ -11,6 +11,7 @@ dependencies = []
 
 [project.scripts]
 mediatheque = "mediatheque:main"
+mediatheque-init = "mediatheque.init_db:main"
 
 [build-system]
 requires = ["uv_build>=0.12.23,<0.13.0"]
