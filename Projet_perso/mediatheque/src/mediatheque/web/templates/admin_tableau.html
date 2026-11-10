@@ -1,0 +1,83 @@
+{% extends "base.html" %}
+{% block titre %}Tableau de bord{% endblock %}
+{% block contenu %}
+<div class="titre-page">
+  <div>
+    <h1>Tableau de bord</h1>
+    <p class="muted">{{ aujourdhui|fr }}</p>
+  </div>
+</div>
+
+<div class="stats">
+  <div class="carte stat"><span class="label">Documents</span><span class="valeur">{{ stats.documents }}</span><span class="muted small">{{ stats.en_rayon }} en rayon</span></div>
+  <div class="carte stat"><span class="label">Emprunts en cours</span><span class="valeur">{{ stats.emprunts }}</span><span class="muted small">{{ stats.emprunteurs }} adhérent{{ 's' if stats.emprunteurs > 1 }}</span></div>
+  <div class="carte stat"><span class="label">Retards</span><span class="valeur {{ 'alerte' if retards }}">{{ retards|length }}</span><span class="muted small">{{ 'à relancer' if retards else 'aucun' }}</span></div>
+  <div class="carte stat"><span class="label">Réservations actives</span><span class="valeur">{{ stats.reservations }}</span><span class="muted small">{{ stats.mises_de_cote }} mise{{ 's' if stats.mises_de_cote > 1 }} de côté</span></div>
+</div>
+
+<div class="rangee">
+  <section class="carte pad col-etroite" aria-labelledby="h-gui">
+    <h2 id="h-gui">Guichet</h2>
+    <nav class="segments" aria-label="Opération">
+      <a href="{{ url_for('tableau_de_bord', onglet='emprunt') }}" {% if onglet != 'retour' %}aria-current="true"{% endif %}>Emprunt</a>
+      <a href="{{ url_for('tableau_de_bord', onglet='retour') }}" {% if onglet == 'retour' %}aria-current="true"{% endif %}>Retour</a>
+    </nav>
+    {% if onglet == 'retour' %}
+      <form method="post" action="{{ url_for('admin_retour') }}" style="display: flex; flex-direction: column; gap: 14px">
+        {{ jeton() }}
+        <div class="champ"><label for="doc-r">Document rendu</label>
+          <select id="doc-r" name="id_document" required>
+            {% for d in documents %}<option value="{{ d.id }}">{{ d.id }} — {{ d.titre }}</option>{% endfor %}
+          </select></div>
+        <button class="btn plein" type="submit">Enregistrer le retour</button>
+      </form>
+    {% else %}
+      <form method="post" action="{{ url_for('admin_emprunt') }}" style="display: flex; flex-direction: column; gap: 14px">
+        {{ jeton() }}
+        <div class="champ"><label for="doc-e">Document</label>
+          <select id="doc-e" name="id_document" required>
+            {% for d in documents %}<option value="{{ d.id }}">{{ d.id }} — {{ d.titre }}</option>{% endfor %}
+          </select></div>
+        <div class="champ"><label for="adh-e">Adhérent</label>
+          <select id="adh-e" name="numero" required>
+            {% for a in adherents %}<option value="{{ a.numero }}">{{ a.numero }} — {{ a.nom_complet }}</option>{% endfor %}
+          </select></div>
+        <button class="btn plein" type="submit">Enregistrer l'emprunt</button>
+      </form>
+    {% endif %}
+  </section>
+
+  <section class="carte col-large" aria-labelledby="h-ret">
+    <div class="carte-titre">
+      <h2 id="h-ret">Retards</h2>
+      <a class="btn second petit" href="{{ url_for('admin_retards_csv') }}">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg>Exporter CSV</a>
+    </div>
+    {% if retards %}
+    <div class="defile">
+      <table>
+        <thead><tr><th>Document</th><th>Adhérent</th><th>Date limite</th><th>Retard</th></tr></thead>
+        <tbody>
+        {% for r in retards %}
+          <tr>
+            <td><strong>{{ r.doc.titre }}</strong><span class="sous">{{ r.doc.id }}</span></td>
+            <td>{{ r.nom }}<span class="sous">{{ r.emprunt.numero_adherent }}</span></td>
+            <td>{{ r.emprunt.date_limite(r.doc.duree_pret_jour)|fr }}</td>
+            <td><span class="badge retard">{{ r.jours }} jour{{ 's' if r.jours > 1 }}</span></td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}<p class="vide">Aucun retard.</p>{% endif %}
+    {% if top %}
+    <div class="barres">
+      <h3 class="muted small">Top emprunteurs</h3>
+      {% for nom, nb in top %}
+        <div class="barre"><span class="nom">{{ nom }}</span><span class="piste"><span style="width: {{ (100 * nb / top_max)|round|int }}%"></span></span><span>{{ nb }}</span></div>
+      {% endfor %}
+    </div>
+    {% endif %}
+  </section>
+</div>
+{% endblock %}

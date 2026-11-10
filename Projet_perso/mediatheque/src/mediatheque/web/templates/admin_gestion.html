@@ -1,0 +1,111 @@
+{% extends "base.html" %}
+{% block titre %}Catalogue & adhérents{% endblock %}
+{% block contenu %}
+<div class="titre-page">
+  <h1>Catalogue &amp; adhérents</h1>
+  <nav class="segments" aria-label="Section">
+    <a href="{{ url_for('gestion') }}" {% if onglet == 'documents' %}aria-current="true"{% endif %}>Documents</a>
+    <a href="{{ url_for('gestion', onglet='adherents') }}" {% if onglet == 'adherents' %}aria-current="true"{% endif %}>Adhérents</a>
+  </nav>
+</div>
+
+<div class="rangee">
+{% if onglet == 'documents' %}
+  <section class="carte col-large" aria-labelledby="h-list">
+    <div class="carte-titre"><h2 id="h-list">Documents ({{ documents|length }})</h2></div>
+    <div class="defile">
+      <table>
+        <thead><tr><th>ID</th><th>Titre</th><th>Type</th><th>État</th><th><span class="sr">Actions</span></th></tr></thead>
+        <tbody>
+        {% for d, statut in documents %}
+          <tr>
+            <td class="muted">{{ d.id }}</td>
+            <td><strong>{{ d.titre }}</strong><span class="sous">{{ d.detail }}</span></td>
+            <td>{{ d.TYPE }} · {{ d.annee }}</td>
+            <td><span class="badge {{ statut }}">{{ {'disponible': 'disponible', 'emprunte': 'emprunté', 'reserve': 'réservé'}[statut] }}</span></td>
+            <td class="actions">
+              <form method="post" action="{{ url_for('admin_supprimer_document', id_document=d.id) }}">{{ jeton() }}
+                <button class="btn second petit" type="submit" aria-label="Supprimer {{ d.titre }}">Supprimer</button>
+              </form>
+            </td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="carte pad col-etroite" aria-labelledby="h-form">
+    <h2 id="h-form">Ajouter un document</h2>
+    <form method="post" action="{{ url_for('admin_ajouter_document') }}" style="display: flex; flex-direction: column; gap: 14px">
+      {{ jeton() }}
+      <div class="champ"><label for="f-type">Type</label>
+        <select id="f-type" name="type">{% for cle, libelle in TYPES %}<option value="{{ cle }}">{{ libelle }}</option>{% endfor %}</select></div>
+      <div class="deux">
+        <div class="champ"><label for="f-id">Identifiant</label><input id="f-id" name="id" value="{{ prochain_doc }}" required pattern="D[0-9]+" maxlength="10"></div>
+        <div class="champ"><label for="f-annee">Année</label><input id="f-annee" name="annee" inputmode="numeric" required pattern="[0-9]{1,4}" placeholder="2024"></div>
+      </div>
+      <div class="champ"><label for="f-titre">Titre</label><input id="f-titre" name="titre" required maxlength="200"></div>
+      <div class="champ"><label for="f-extra">Auteur, durée ou numéro</label><input id="f-extra" name="extra" required maxlength="200">
+        <span class="aide">Auteur pour un livre, durée en minutes pour un DVD, numéro pour une revue.</span></div>
+      <button class="btn plein" type="submit">Ajouter au catalogue</button>
+    </form>
+    <p class="muted small">Un document qui a déjà été emprunté ou réservé ne peut pas être supprimé (historique conservé).</p>
+  </section>
+{% else %}
+  <section class="carte col-large" aria-labelledby="h-list">
+    <div class="carte-titre"><h2 id="h-list">Adhérents ({{ adherents|length }})</h2></div>
+    <div class="defile">
+      <table>
+        <thead><tr><th>N°</th><th>Nom</th><th>Formule</th><th>Situation</th></tr></thead>
+        <tbody>
+        {% for a, c in adherents %}
+          {% set retards = c.emprunts|selectattr('jours_retard')|list %}
+          <tr>
+            <td class="muted">{{ a.numero }}</td>
+            <td><strong>{{ a.nom_complet }}</strong></td>
+            <td>{{ a.type|capitalize }} · {{ c.emprunts|length }}/{{ a.quota }}</td>
+            <td>{% if retards %}<span class="badge retard">{{ retards|length }} retard{{ 's' if retards|length > 1 }}</span>
+                {% else %}<span class="badge ok">à jour</span>{% endif %}
+                {% if c.reservations %}<span class="badge reserve">{{ c.reservations|length }} résa</span>{% endif %}</td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <div class="col-etroite" style="display: flex; flex-direction: column; gap: 24px">
+    <section class="carte pad" aria-labelledby="h-form">
+      <h2 id="h-form">Nouvel adhérent</h2>
+      <form method="post" action="{{ url_for('admin_ajouter_adherent') }}" style="display: flex; flex-direction: column; gap: 14px">
+        {{ jeton() }}
+        <input type="hidden" name="numero" value="{{ prochain_adh }}">
+        <p class="muted small" style="margin: 0">Numéro attribué : <strong>{{ prochain_adh }}</strong></p>
+        <div class="deux">
+          <div class="champ"><label for="a-prenom">Prénom</label><input id="a-prenom" name="prenom" required maxlength="60"></div>
+          <div class="champ"><label for="a-nom">Nom</label><input id="a-nom" name="nom" required maxlength="60"></div>
+        </div>
+        <div class="champ"><label for="a-type">Formule</label>
+          <select id="a-type" name="type"><option value="standard">Standard (3 emprunts)</option><option value="premium">Premium (6 emprunts)</option></select></div>
+        <div class="champ"><label for="a-login">Identifiant de connexion</label><input id="a-login" name="identifiant" placeholder="ex. ines.petit" maxlength="32" autocomplete="off">
+          <span class="aide">Laisser vide pour créer l'adhérent sans compte en ligne.</span></div>
+        <div class="champ"><label for="a-mdp">Mot de passe provisoire</label><input id="a-mdp" name="mot_de_passe" type="password" autocomplete="new-password">
+          <span class="aide">8 caractères minimum, lettres et chiffres.</span></div>
+        <button class="btn plein" type="submit">Créer l'adhérent</button>
+      </form>
+    </section>
+
+    <section class="carte pad" aria-labelledby="h-reset">
+      <h2 id="h-reset">Réinitialiser un mot de passe</h2>
+      <form method="post" action="{{ url_for('admin_reinitialiser') }}" style="display: flex; flex-direction: column; gap: 14px">
+        {{ jeton() }}
+        <div class="champ"><label for="r-login">Identifiant</label><input id="r-login" name="identifiant" required maxlength="32" autocomplete="off"></div>
+        <div class="champ"><label for="r-mdp">Nouveau mot de passe</label><input id="r-mdp" name="mot_de_passe" type="password" required autocomplete="new-password"></div>
+        <button class="btn second plein" type="submit">Réinitialiser</button>
+      </form>
+    </section>
+  </div>
+{% endif %}
+</div>
+{% endblock %}

@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% block titre %}Connexion{% endblock %}
+{% block corps %}
+<main class="connexion">
+  <section class="connexion-pitch">
+    <span class="logo">{{ icone_logo }}Médiathèque</span>
+    <div>
+      <h1>Vos livres, DVD et revues, à portée de clic.</h1>
+      <p>Parcourez le catalogue, suivez vos emprunts et réservez un document dès qu'il est rendu.</p>
+    </div>
+    <div class="chiffres">
+      <div><strong>21 j</strong>prêt d'un livre</div>
+      <div><strong>7 j</strong>prêt DVD &amp; revue</div>
+      <div><strong>3 j</strong>pour retirer une réservation</div>
+    </div>
+  </section>
+  <section class="connexion-form">
+    <form method="post" action="{{ url_for('connexion') }}">
+      {{ jeton() }}
+      <div>
+        <h2>Connexion</h2>
+        <p class="muted">Adhérents et responsable utilisent le même formulaire.</p>
+      </div>
+      {% if erreur %}<div class="message erreur" role="alert">{{ erreur|capitalize }}.</div>{% endif %}
+      <div class="champ">
+        <label for="identifiant">Identifiant</label>
+        <input id="identifiant" name="identifiant" autocomplete="username" required maxlength="64" value="{{ identifiant }}" autofocus>
+      </div>
+      <div class="champ">
+        <label for="mot_de_passe">Mot de passe</label>
+        <input id="mot_de_passe" name="mot_de_passe" type="password" autocomplete="current-password" required maxlength="256">
+      </div>
+      <button class="btn plein" type="submit">Se connecter</button>
+      <p class="muted small">Pas encore de compte ? Demandez-le au guichet de la médiathèque.</p>
+    </form>
+  </section>
+</main>
+{% endblock %}
