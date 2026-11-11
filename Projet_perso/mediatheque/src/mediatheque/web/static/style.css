@@ -380,3 +380,33 @@ input:focus-visible, select:focus-visible, textarea:focus-visible { outline: 3px
 .pagination a:hover { border-color: var(--encre-3); color: var(--encre); }
 .pagination a[aria-current="page"] { background: var(--encre); border-color: var(--encre); color: var(--papier); }
 .pagination span { color: var(--encre-3); padding: 0 4px; }
+
+/* ==========================================================================
+   Barres de défilement aux couleurs du site
+   - standard (Firefox, Chrome/Edge récents) : scrollbar-color / scrollbar-width
+   - repli WebKit (Safari, anciens Chrome) : ::-webkit-scrollbar
+   ========================================================================== */
+/* Les proprietes standard seulement la ou ::-webkit-scrollbar n'existe pas (Firefox) :
+   sinon Chrome les prefere et affiche des fleches aux extremites. */
+@supports not selector(::-webkit-scrollbar) {
+  html { scrollbar-color: #B8AC98 var(--papier-2); }      /* pouce carton, rail papier */
+  .defile, .etagere.defilante, textarea { scrollbar-color: #C9BDA8 transparent; scrollbar-width: thin; }
+  .etagere.defilante:hover, .defile:hover { scrollbar-color: var(--accent) transparent; }
+}
+
+::-webkit-scrollbar { width: 12px; height: 12px; }
+::-webkit-scrollbar-track { background: var(--papier-2); }
+::-webkit-scrollbar-thumb {
+  background: #B8AC98; border-radius: 999px;
+  border: 3px solid var(--papier-2);          /* donne l'effet de pouce « flottant » */
+}
+::-webkit-scrollbar-thumb:hover { background: var(--encre-3); }
+::-webkit-scrollbar-corner { background: transparent; }
+::-webkit-scrollbar-button { display: none; width: 0; height: 0; }
+
+.defile::-webkit-scrollbar, .etagere.defilante::-webkit-scrollbar, textarea::-webkit-scrollbar { height: 8px; width: 8px; }
+.defile::-webkit-scrollbar-track, .etagere.defilante::-webkit-scrollbar-track,
+textarea::-webkit-scrollbar-track { background: transparent; }
+.defile::-webkit-scrollbar-thumb, .etagere.defilante::-webkit-scrollbar-thumb,
+textarea::-webkit-scrollbar-thumb { background: #C9BDA8; border: 0; }
+.etagere.defilante:hover::-webkit-scrollbar-thumb, .defile:hover::-webkit-scrollbar-thumb { background: var(--accent); }
