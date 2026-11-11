@@ -67,7 +67,7 @@ def test_compte_lie_a_un_adherent_inexistant_refuse(db):
 def test_deux_comptes_pour_le_meme_adherent_refuses(db):
     """Sinon un second identifiant pourrait agir au nom de A001."""
     copier_compte(db, "lea2", ADHERENT, "A001")
-    with pytest.raises(MediathequeError, match="deja un compte"):
+    with pytest.raises(MediathequeError, match="déjà un compte"):
         Mediatheque.charger(db)
 
 

@@ -85,7 +85,7 @@ def valider_mot_de_passe(mot_de_passe):
     if (len(mot_de_passe) < 8 or not re.search(r"[A-Za-z]", mot_de_passe)
             or not re.search(r"\d", mot_de_passe)):
         raise MediathequeError(
-            "mot de passe trop faible : 8 caracteres minimum, avec lettres et chiffres")
+            "Mot de passe trop faible : 8 caractères minimum, avec des lettres et des chiffres.")
 
 
 @dataclass(frozen=True)
@@ -131,7 +131,7 @@ class GestionComptes:
     def ajouter(self, compte):
         with self._verrou:
             if compte.identifiant in self._comptes:
-                raise MediathequeError(f"identifiant deja utilise : {compte.identifiant}")
+                raise MediathequeError(f"Cet identifiant est déjà pris : {compte.identifiant}.")
             self._comptes[compte.identifiant] = compte
 
     def verifier_nouveau(self, identifiant, mot_de_passe):
@@ -143,7 +143,7 @@ class GestionComptes:
             raise MediathequeError(
                 "identifiant invalide : 3 a 32 caracteres parmi a-z 0-9 . _ -")
         if identifiant in self._comptes:
-            raise MediathequeError(f"identifiant deja utilise : {identifiant}")
+            raise MediathequeError(f"Cet identifiant est déjà pris : {identifiant}.")
         valider_mot_de_passe(mot_de_passe)
         return identifiant
 
@@ -243,7 +243,7 @@ class GestionComptes:
         """Reserve au responsable (controle dans Session)."""
         compte = self._comptes.get(identifiant)
         if compte is None:
-            raise MediathequeError(f"compte inconnu : {identifiant}")
+            raise MediathequeError(f"Aucun compte avec l'identifiant {identifiant}.")
         valider_mot_de_passe(nouveau)
         with self._verrou:
             self._echecs.pop(identifiant, None)

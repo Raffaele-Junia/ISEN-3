@@ -9,19 +9,25 @@ Les objets renvoyes (documents, adherent) sont des COPIES : les modifier n'a
 aucun effet sur l'etat metier. Le compte de la session est immuable.
 """
 import re
+import unicodedata
 from copy import copy
 from datetime import date
 from functools import wraps
 
 from .adherents import Adherent
 from .auth import ADHERENT, RESPONSABLE
-from .documents import Document
+from .documents import CHAMPS_FICHE, Document
 from . import recommandations
 from .exceptions import AccesRefuseError, DocumentInconnuError, MediathequeError
 from .rapports import retards, top_emprunteurs
 
 
 _FORMAT_ID_DOCUMENT = re.compile(r"D\d+")
+
+
+def _sans_accents(texte):
+    """« Émile Zola » -> « emile zola » (recherche tolerante)."""
+    return unicodedata.normalize("NFKD", texte).encode("ascii", "ignore").decode().lower()
 _JETON = object()  # seul ouvrir_session peut construire une Session (S4)
 
 
@@ -105,21 +111,37 @@ class Session:
 
     # ---------------------------------------------------------------- communs
     @connexion_requise
-    def catalogue(self, texte="", type_doc=None, genre=None):
-        """Liste de (document, statut) filtree par texte, type et genre.
-        Le texte cherche dans l'identifiant, le titre, le detail, le genre et les themes."""
-        texte = texte.strip().lower()
+    def catalogue(self, texte="", type_doc=None, genre=None, public=None):
+        """Liste de (document, statut) filtree par texte, type, genre et public.
+
+        La recherche ignore accents et majuscules (« emile zola », « miserables »),
+        et chaque mot doit apparaitre dans l'identifiant, le titre, l'auteur ou le
+        detail, le genre, les themes, le resume, l'editeur ou le public."""
+        mots = _sans_accents(texte).split()
         resultat = []
         for d in sorted(self._m):
             if type_doc and d.CLE != type_doc:
                 continue
             if genre and d.genre != genre:
                 continue
-            if texte and texte not in " ".join(
-                    (d.id, d.titre, str(d.detail), d.genre, *d.themes)).lower():
+            if public and d.public != public:
                 continue
+            if mots:
+                botte = _sans_accents(" ".join((d.id, d.titre, str(d.detail), d.genre,
+                                                *d.themes, d.resume, d.editeur, d.public)))
+                if not all(m in botte for m in mots):
+                    continue
             resultat.append((copy(d), self._statut(d.id)))
         return resultat
+
+    @connexion_requise
+    def publics(self):
+        """Publics presents dans le fonds, avec leur nombre de documents."""
+        compteur = {}
+        for d in self._m:
+            if d.public:
+                compteur[d.public] = compteur.get(d.public, 0) + 1
+        return sorted(compteur.items())
 
     @connexion_requise
     def genres(self):
@@ -232,10 +254,23 @@ class Session:
         """`fiche` : genre, themes, resume, editeur, pages, isbn, public (optionnels)."""
         if not isinstance(id_document, str) or not _FORMAT_ID_DOCUMENT.fullmatch(id_document):
             raise MediathequeError(
-                f"identifiant de document invalide : {id_document!r} (attendu : D suivi de chiffres)")
-        document = Document.from_csv_row({"id": id_document, "type": type_doc,
-                                          "titre": titre, "annee": annee, "extra": extra})
-        document.completer_fiche(**fiche)
+                f"N° d'inventaire invalide : {id_document!r} (attendu : D suivi de chiffres, ex. D137).")
+        if not str(annee).strip().isdigit():
+            raise MediathequeError("L'année doit être un nombre, par exemple 2024.")
+        try:
+            document = Document.from_csv_row({"id": id_document, "type": type_doc,
+                                              "titre": titre, "annee": annee, "extra": extra})
+        except ValueError:
+            raise MediathequeError(
+                "Pour un film, indiquez la durée en minutes (par exemple 125) ; "
+                "pour une revue, le numéro (par exemple 1296).") from None
+        inconnus = set(fiche) - set(CHAMPS_FICHE)
+        if inconnus:  # erreur de programmation, pas de saisie : on la laisse remonter
+            raise ValueError(f"champ de fiche inconnu : {', '.join(sorted(inconnus))}")
+        try:
+            document.completer_fiche(**fiche)
+        except ValueError as e:
+            raise MediathequeError(f"Fiche invalide : {e}.") from None
         self._m.ajouter_document(document)
         return document
 
@@ -277,6 +312,12 @@ class Session:
     @responsable_requis
     def enregistrer_retour(self, id_document, jour=None):
         return self._m.retourner(id_document, jour)
+
+    @responsable_requis
+    def mis_de_cote_pour(self, id_document):
+        """Lecteur (Adherent, copie) pour qui le document est mis de cote, ou None."""
+        r = self._m._mise_de_cote(id_document)
+        return copy(self._m.adherent(r.numero_adherent)) if r else None
 
     @responsable_requis
     def retards(self, aujourdhui=None):

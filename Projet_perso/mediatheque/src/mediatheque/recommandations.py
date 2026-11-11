@@ -196,14 +196,22 @@ def pour_adherent(m, numero, n=8, aujourdhui=None):
 
     retenus = [i for i, s in scores.items() if s >= SEUIL]
     retenus.sort(key=lambda i: (-scores[i], not m.disponible(i, numero), m[i].titre))
-    resultat = []
-    for i in retenus[:n]:
+    resultat, revues_vues = [], set()
+    for i in retenus:
+        if len(resultat) >= n:
+            break
         vu, candidat = raisons[i][1], m[i]
+        if candidat.CLE == "revue":  # un seul numero par revue : de la variete
+            if candidat.titre in revues_vues:
+                continue
+            revues_vues.add(candidat.titre)
         verbe = "vu" if vu.CLE == "dvd" else "lu"
         if vu.CLE == candidat.CLE == "revue" and vu.titre == candidat.titre:
             raison = f"Un autre numéro de « {vu.titre} »"
         elif ressemblance(vu, candidat) < SEUIL:  # le lien vient des usages, pas du contenu
             raison = f"Les lecteurs de « {vu.titre} » l'ont aussi emprunté"
+        elif vu.CLE == "revue" and candidat.CLE != "revue":
+            raison = f"Pour prolonger votre lecture de « {vu.titre} »"
         else:
             raison = f"Parce que vous avez {verbe} « {vu.titre} »"
         resultat.append((candidat, raison))

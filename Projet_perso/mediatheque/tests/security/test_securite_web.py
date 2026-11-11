@@ -275,7 +275,7 @@ def test_idor_annuler_la_reservation_d_un_autre(web_app, web_ines, web_lea):
     # Lea tente d'annuler la reservation d'Ines par l'URL
     poster(web_lea, "/annuler/D001", page="/compte")
     assert [r.statut for r in m.file_attente("D001")] == ["en_attente"]
-    assert "aucune reservation active" in web_lea.get("/compte").get_data(as_text=True)
+    assert "pas de réservation pour ce document" in web_lea.get("/compte").get_data(as_text=True)
 
 
 def test_adherent_ne_peut_cibler_un_autre_numero_par_formulaire(web_app, web_lea):
@@ -307,7 +307,7 @@ def test_xss_identifiant_reflechi_echappe(web_app):
 def test_xss_message_flash_avec_id_de_l_url(web_lea):
     poster(web_lea, "/reserver/" + "%3Cscript%3Ealert(1)%3C!--")
     page = web_lea.get("/catalogue").get_data(as_text=True)
-    assert "document inconnu" in page
+    assert "Document inconnu" in page
     assert "<script>alert(1)" not in page and "&lt;script&gt;" in page
 
 

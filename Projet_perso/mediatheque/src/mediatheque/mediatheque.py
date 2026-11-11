@@ -30,12 +30,12 @@ class Mediatheque:
     # ------------------------------------------------------------------ ajout
     def ajouter_document(self, document):
         if document.id in self._documents:
-            raise MediathequeError(f"identifiant de document deja utilise : {document.id}")
+            raise MediathequeError(f"Ce n° d'inventaire est déjà utilisé : {document.id}.")
         self._documents[document.id] = document
 
     def ajouter_adherent(self, adherent):
         if adherent.numero in self._adherents:
-            raise MediathequeError(f"numero d'adherent deja utilise : {adherent.numero}")
+            raise MediathequeError(f"Ce n° de carte est déjà utilisé : {adherent.numero}.")
         self._adherents[adherent.numero] = adherent
 
     def ajouter_emprunt(self, emprunt):
@@ -51,14 +51,14 @@ class Mediatheque:
             raise AdherentInconnuError(compte.numero_adherent)
         if compte.role == ADHERENT and self.comptes.compte_de_adherent(compte.numero_adherent):
             raise MediathequeError(
-                f"l'adherent {compte.numero_adherent} a deja un compte")
+                f"Le lecteur {compte.numero_adherent} a déjà un compte en ligne.")
         self.comptes.ajouter(compte)
 
     def creer_compte(self, identifiant, mot_de_passe, role, numero_adherent=None):
         if numero_adherent is not None:
             self.adherent(numero_adherent)  # leve AdherentInconnuError
             if self.comptes.compte_de_adherent(numero_adherent):
-                raise MediathequeError(f"l'adherent {numero_adherent} a deja un compte")
+                raise MediathequeError(f"Le lecteur {numero_adherent} a déjà un compte en ligne.")
         return self.comptes.creer(identifiant, mot_de_passe, role, numero_adherent)
 
     def supprimer_document(self, id_document):
@@ -67,7 +67,7 @@ class Mediatheque:
         if (any(e.id_document == id_document for e in self._emprunts)
                 or any(r.id_document == id_document for r in self._reservations)):
             raise MediathequeError(
-                "document avec un historique d'emprunts ou de reservations : suppression refusee")
+                "Ce document a déjà circulé : on garde son historique, il ne peut pas être retiré.")
         return self._documents.pop(id_document)
 
     def _verifier_references(self, id_document, numero):
@@ -219,7 +219,14 @@ class Mediatheque:
         self._verifier_references(id_document, numero)
         self.actualiser_reservations(jour)
         if not self.disponible(id_document, numero):
-            raise DocumentIndisponibleError(self._documents[id_document].titre)
+            titre = self._documents[id_document].titre
+            reservee = self._mise_de_cote(id_document)
+            if reservee is not None and not self._emprunt_en_cours(id_document):
+                limite = reservee.date_limite_retrait
+                raise DocumentIndisponibleError(titre, (
+                    f"« {titre} » est mis de côté pour un autre lecteur (réservation) : "
+                    f"lui seul peut l'emprunter jusqu'au {limite.day}/{limite.month:02d}."))
+            raise DocumentIndisponibleError(titre)
 
         quota = self._adherents[numero].quota
         nb_en_cours = len(self.emprunts_de(numero))
@@ -238,7 +245,7 @@ class Mediatheque:
             raise DocumentInconnuError(id_document)
         emprunt = self._emprunt_en_cours(id_document)
         if emprunt is None:
-            raise MediathequeError(f"aucun emprunt en cours pour : {id_document}")
+            raise MediathequeError(f"Ce document n'est pas sorti : rien à rendre ({id_document}).")
         emprunt.date_retour = date_retour or date.today()
         self._promouvoir_suivant(id_document, emprunt.date_retour)
         return emprunt
@@ -250,15 +257,15 @@ class Mediatheque:
         self.actualiser_reservations(jour)
         if self.disponible(id_document, numero):
             raise ReservationImpossibleError(
-                "document disponible : il peut etre emprunte directement")
+                "Ce document est en rayon : vous pouvez venir l'emprunter directement.")
         en_cours = self._emprunt_en_cours(id_document)
         if en_cours is not None and en_cours.numero_adherent == numero:
-            raise ReservationImpossibleError("vous avez deja ce document en emprunt")
+            raise ReservationImpossibleError("Vous avez déjà ce document chez vous.")
         if any(r.numero_adherent == numero for r in self.file_attente(id_document)):
-            raise ReservationImpossibleError("vous avez deja reserve ce document")
+            raise ReservationImpossibleError("Vous avez déjà réservé ce document.")
         if len(self.reservations_de(numero)) >= MAX_RESERVATIONS:
             raise ReservationImpossibleError(
-                f"limite de {MAX_RESERVATIONS} reservations actives atteinte")
+                f"Vous avez déjà {MAX_RESERVATIONS} réservations : annulez-en une pour en faire une nouvelle.")
         reservation = Reservation(id_document, numero, jour)
         self._reservations.append(reservation)
         return reservation
@@ -272,7 +279,7 @@ class Mediatheque:
                 if etait_de_cote:
                     self._promouvoir_suivant(id_document, jour)
                 return r
-        raise ReservationImpossibleError("aucune reservation active pour ce document")
+        raise ReservationImpossibleError("Vous n'avez pas de réservation pour ce document.")
 
     def actualiser_reservations(self, aujourdhui):
         """Expire les mises de cote non retirees et passe la main au suivant."""

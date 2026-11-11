@@ -7,7 +7,7 @@ from mediatheque import recommandations as reco
 from mediatheque.adherents import Adherent
 from mediatheque.auth import ADHERENT, RESPONSABLE
 from mediatheque.documents import DVD, Livre
-from mediatheque.exceptions import AccesRefuseError, DocumentInconnuError
+from mediatheque.exceptions import AccesRefuseError, DocumentInconnuError, MediathequeError
 from mediatheque.mediatheque import Mediatheque
 from mediatheque.session import ouvrir_session
 
@@ -127,3 +127,36 @@ def test_session_ajouter_document_avec_fiche(mr):
     d = admin.ajouter_document("livre", "D010", "Dune", "1965", "Frank Herbert",
                                genre="Science-fiction", themes="désert|pouvoir", pages="600")
     assert d.themes == ("désert", "pouvoir") and d.pages == 600
+
+
+# ------------------------------------------------- retours du panel UX
+def test_recherche_sans_accents_et_dans_le_resume(mr):
+    mr["D001"].completer_fiche(resume="Big Brother vous regarde, écrit par Orwell.")
+    lea = ouvrir_session(mr, "lea", MDP)
+    assert {d.id for d, _ in lea.catalogue("big brother")} == {"D001"}
+    assert {d.id for d, _ in lea.catalogue("diner")} == {"D005"}       # « Dîner »
+    assert {d.id for d, _ in lea.catalogue("ORWELL ferme")} == {"D002"}  # tous les mots
+
+
+def test_catalogue_par_public(mr):
+    mr["D005"].completer_fiche(public="jeunesse")
+    lea = ouvrir_session(mr, "lea", MDP)
+    assert {d.id for d, _ in lea.catalogue(public="jeunesse")} == {"D005"}
+    assert ("jeunesse", 1) in lea.publics()
+
+
+def test_ajouter_document_saisie_invalide_message_clair(mr):
+    admin = ouvrir_session(mr, "admin", MDP)
+    with pytest.raises(MediathequeError, match="durée en minutes"):
+        admin.ajouter_document("dvd", "D020", "Film", "2001", "2h05")
+    with pytest.raises(MediathequeError, match="année"):
+        admin.ajouter_document("livre", "D021", "Livre", "deux mille", "Auteur")
+
+
+def test_mis_de_cote_pour(mr):
+    mr.emprunter("D001", "A002", AUJOURDHUI)
+    mr.reserver("D001", "A001", AUJOURDHUI)
+    mr.retourner("D001", AUJOURDHUI)
+    admin = ouvrir_session(mr, "admin", MDP)
+    assert admin.mis_de_cote_pour("D001").numero == "A001"
+    assert admin.mis_de_cote_pour("D003") is None

@@ -5,19 +5,19 @@ class MediathequeError(Exception):
 class DocumentInconnuError(MediathequeError):
     def __init__(self, id_document):
         self.id_document = id_document
-        super().__init__(f"document inconnu : {id_document}")
+        super().__init__(f"Document inconnu : {id_document}.")
 
 
 class AdherentInconnuError(MediathequeError):
     def __init__(self, numero):
         self.numero = numero
-        super().__init__(f"adherent inconnu : {numero}")
+        super().__init__(f"Lecteur inconnu : {numero}.")
 
 
 class DocumentIndisponibleError(MediathequeError):
-    def __init__(self, titre):
+    def __init__(self, titre, message=None):
         self.titre = titre
-        super().__init__(f"document deja emprunte : {titre}")
+        super().__init__(message or f"« {titre} » est déjà emprunté.")
 
 
 class ReservationImpossibleError(MediathequeError):
@@ -27,14 +27,14 @@ class ReservationImpossibleError(MediathequeError):
 class AuthentificationError(MediathequeError):
     """Identifiant ou mot de passe incorrect (message volontairement vague)."""
 
-    def __init__(self, message="identifiant ou mot de passe incorrect"):
+    def __init__(self, message="Identifiant ou mot de passe incorrect"):
         super().__init__(message)
 
 
 class CompteBloqueError(AuthentificationError):
     def __init__(self, secondes_restantes):
         self.secondes_restantes = secondes_restantes
-        super().__init__(f"trop de tentatives, reessayez dans {secondes_restantes} s")
+        super().__init__(f"Trop de tentatives : réessayez dans {secondes_restantes} s")
 
 
 class AccesRefuseError(MediathequeError):
@@ -45,4 +45,4 @@ class QuotaDepasseError(MediathequeError):
     def __init__(self, nb_actuel, quota):
         self.nb_actuel = nb_actuel
         self.quota = quota
-        super().__init__(f"quota depasse : {nb_actuel}/{quota}")
+        super().__init__(f"Carte pleine : ce lecteur a déjà {nb_actuel} documents sur {quota}.")

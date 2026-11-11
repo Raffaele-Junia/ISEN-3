@@ -206,7 +206,7 @@ def test_w4_echec_partiel_annule(web_app, web_admin, web_ines):
            numero="A004", prenom="Noe", nom="Blanc", type="standard",
            identifiant="noe.blanc", mot_de_passe="faible")  # refuse par la politique
     page = web_admin.get("/admin/gestion?onglet=adherents").get_data(as_text=True)
-    assert "mot de passe trop faible" in page
+    assert "Mot de passe trop faible" in page
     poster(web_ines, "/reserver/D001")  # action ordinaire d'un autre utilisateur
     assert "A004" not in [a.numero for a in Mediatheque.charger(m._source).adherents]
     assert "A004" not in [a.numero for a in m.adherents]
