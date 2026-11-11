@@ -72,7 +72,8 @@ Plan détaillé et priorités : `docs/RAPPORT_SITUATION.md`. **Mettre à jour la
 - Messages d'erreur métier : en français correct, avec majuscule et ponctuation, écrits à la source. Les gabarits ne les capitalisent plus.
 - Recommandations : « Dans la même veine » exige un lien de contenu (`LIEN_CONTENU_MIN`). Les co-emprunts ne sont qu'un bonus (0,8 par lecteur). Bonus `POIDS_MEME_SUPPORT` quand le genre et le support sont les mêmes.
 - 343 tests au total.
-- [ ] P3 : README, journalisation, audit final
+- [x] README (captures dans `docs/captures/`, sans couverture protégée)
+- [ ] P3 : journalisation des actions du responsable, pagination, audit final
 
 ## Règles de travail
 - Ne jamais modifier `data/` pendant les tests ou les démos : utiliser `tmp_path` ou une copie.
