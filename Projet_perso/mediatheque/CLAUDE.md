@@ -63,6 +63,14 @@ Plan détaillé et priorités : `docs/RAPPORT_SITUATION.md`. **Mettre à jour la
 - [x] P2 bis : audit du site web, `docs/securite/AUDIT_2026-11-10_web.md`. Il trouve les failles W1–W7 (3 moyennes, 4 basses), prouvées par des tests dans `tests/security/test_securite_web*.py`.
 - [x] Refonte visuelle « Médiathèque des Tilleuls » (rendu moins « IA »).
 - [x] W1–W7 corrigées par l'agent `security-fixer` (un commit par faille, plus les redirections internes). 254 tests au total.
+- [x] Fiches documents (`documents.py` : genre, thèmes, résumé, éditeur, pages, ISBN, public ; migration SQLite automatique). Page `/document/<id>`. Résumés de démo dans `scripts/fiches_demo.py`.
+- [x] Recommandations (`recommandations.py`) : ressemblance (genre, thèmes, auteur, revue, époque) combinée aux co-emprunts **anonymisés** (seuil de 3 autres lecteurs). Index du fonds et cache des co-emprunts, 10 lectures récentes au plus. « Dans la même veine » sur la fiche, « Pour vous » sur Ma carte, avec une raison lisible.
+- [x] Vraies couvertures téléchargées une fois depuis Open Library (`scripts/telecharger_couvertures.py`, HTTPS et domaines autorisés, images hors git), avec repli sur la couverture typographique.
+- [x] Audit `AUDIT_2026-11-10_fiches.md` : F1–F5 corrigées.
+- [x] Agent `panel-testeurs` (6 personas). Rapport `docs/ux/PANEL_2026-11-11.md` (27 problèmes). Appliqués : B1–B4, G1–G13 (sauf G5 partiel), C1–C3 et C7–C10. Restent C4 (réalisateur des films), C5 (horaires sur Ma carte), C6 (date de retour dans « Ce que j'attends ») et la pagination du catalogue.
+- Recherche du catalogue : insensible aux accents, multi-mots, dans titre, auteur, genre, thèmes, résumé, éditeur et public. Filtres combinables : type, genre (repliable `<details>`) et « Pour qui ? » (`public`).
+- Messages d'erreur métier : en français correct, avec majuscule et ponctuation, écrits à la source. Les gabarits ne les capitalisent plus.
+- 336 tests au total.
 - [ ] P3 : README, journalisation, audit final
 
 ## Règles de travail
