@@ -83,3 +83,38 @@ Suite complète (`uv run --system-certs pytest -q -p no:cacheprovider`) : **391 
 - **Sauvegardes** : copier régulièrement le `.db` hors du serveur (`sqlite3 .backup`), tester la restauration, et vérifier qu'elle se charge (Z1 montre qu'une base peut devenir illisible).
 - **RGPD** : registre des traitements, information des lecteurs, durée de conservation du journal **et** de l'historique des prêts (aujourd'hui illimitée), polices Google à héberger localement, et procédure de suppression d'un lecteur (qui n'existe pas).
 - **Exploitation** : ne jamais déployer une base créée par `creer_demo.py` (mots de passe publics), installer `pip-audit` dans la CI, et prévoir une surveillance des temps de réponse, car Z2 et Z3 se dégradent sans bruit.
+
+## Corrections
+
+Corrigées par l'agent `security-fixer` le 11/11/2026, un commit par faille. Les 13 preuves `xfail` sont retirées et passent. Aucun test existant n'a été affaibli.
+
+| # | Gravité | Statut | Commit | Correctif |
+|---|---|---|---|---|
+| Z1 | Haute | Corrigée | `7cc3cfa` | `modifier_adherent` refuse le passage à une formule dont le quota est inférieur au nombre de documents chez le lecteur (« Enregistrez d'abord N retours »). |
+| Z2 | Moyenne | Corrigée | `24c5168` | Index `_en_cours` (`{id_document: Emprunt}`) et `_de_cote` (`{id_document: Reservation}`) dans `Mediatheque`, tenus à jour par `ajouter_emprunt`, `ajouter_reservation`, `emprunter`, `retourner`, `reserver`, `annuler_reservation`, `actualiser_reservations`, `_promouvoir_suivant`, `charger` et `recharger`. `_emprunt_en_cours` et `_mise_de_cote` passent en O(1) (une entrée périmée est retirée à la lecture). `/catalogue` n'appelle plus `catalogue()` qu'une fois : le bandeau utilise `Session.compteurs()`. Le contrôle des quotas au chargement passe aussi par un seul `Counter`. Nouveau test : les index donnent exactement le résultat du parcours linéaire après 600 opérations au hasard, sauvegardes et rechargements compris. |
+| Z3 | Moyenne | Corrigée | `96e177f` | Plus de `DELETE FROM journal` : la sauvegarde n'insère que les entrées nouvelles (`_journal_ecrit`). Déclencheurs `journal_sans_modification` et `journal_sans_suppression` (`RAISE(ABORT, …)`), créés aussi dans les bases existantes à l'ouverture. `recharger()` ne relit le journal que si son état (`MIN(id)`, `MAX(id)`) a changé. `CONSERVATION_JOURNAL_JOURS = 365` et purge explicite `python -m mediatheque.purge_journal --db … --responsable admin` (`Mediatheque.purger_journal(compte)`) : réservée à un compte responsable authentifié, journalisée (`purge_journal`), jamais automatique, avec le déclencheur de suppression suspendu le temps d'une seule transaction. |
+| Z4 | Basse | Corrigée | `1665779` | `Session.enregistrer_retour(id_document, jour=None, numero=None)` refuse avec « Ce document n'est pas chez ce lecteur. » quand le prêt appartient à un autre lecteur. La route de la fiche lecteur passe `numero`. `jour` reste le 2e paramètre, pour ne pas casser les appels existants. |
+| Z5 | Basse | Corrigée | `3ec79d6` | `adherents()`, `reserver`, `annuler_reservation`, `annuler_reservation_pour`, `enregistrer_emprunt`, `enregistrer_retour`, `ajouter_document`, `supprimer_document`, `ajouter_adherent` et `retards()` renvoient des copies. Nouveau test d'architecture : chaque méthode publique de `Session` est appelée, et aucun objet renvoyé n'est un objet vivant du modèle. Une nouvelle méthode qui manquerait au scénario fait échouer ce test. |
+| Z6 | Basse | Corrigée | `94e354c` | La vue `/connexion` appelle `ouvrir_session(..., noter_connexion=False)` hors verrou (scrypt, W1), puis `Session.noter_connexion()` sous `verrou`, juste avant `m.sauvegarder()`. En cas d'échec, elle fait `m.recharger()`. `ouvrir_session` journalise toujours par défaut pour les autres appelants. Une seule entrée par session, et la méthode est réservée au responsable. |
+| Z7 | Basse | Corrigée | `72c9d6f` | Règles uniques `FORMAT_ID_DOCUMENT = D[0-9]{1,6}` (`documents.py`) et `FORMAT_NUMERO = A[0-9]{3}` (`adherents.py`), réutilisées par `session.py`, `web/app.py` et `scripts/telecharger_couvertures.py`. L'année et l'ISBN n'acceptent plus que des chiffres ASCII. Les identifiants sont refusés avant toute modification, avec un message en français. |
+
+**Changements visibles**
+- Fiche lecteur : un « Retour » sur un document qui n'est pas (ou plus) chez ce lecteur affiche « Ce document n'est pas chez ce lecteur. » et ne clôt aucun prêt.
+- Gestion : un n° d'inventaire de plus de 6 chiffres ou en chiffres non ASCII est refusé : « N° d'inventaire invalide : … (attendu : D suivi de 1 à 6 chiffres, ex. D137). ». Même chose pour un n° de carte (« N° de carte invalide… ») et pour une année en chiffres pleine chasse. Une base qui contiendrait déjà de tels identifiants serait refusée au chargement.
+- Journal : nouvelle action « Purge du journal (durée de conservation) ». La table `journal` refuse désormais `UPDATE` et `DELETE` en SQL direct.
+- Les objets renvoyés par `Session` ne reflètent plus les changements ultérieurs du modèle (ce sont des instantanés).
+
+**Mesures (Python 3.14, ce poste, scripts jetables hors suite)**
+
+| Mesure | Avant | Après |
+|---|---|---|
+| Z2 : `GET /catalogue`, 2 000 documents et 12 000 prêts | 1,85 s | 0,011 s |
+| Z2 : `GET /compte`, même base | 0,99 s | 0,10 s |
+| Z3 : sauvegarde avec un journal de 70 000 entrées | 0,28 s | 0,018 s |
+| Z3 : rechargement, journal de 70 000 entrées inchangé | 0,27 s | 0,014 s |
+| Z3 : sauvegarde avec un journal de 350 000 entrées | 1,41 s | 0,062 s |
+| Z3 : rechargement, journal de 350 000 entrées inchangé | 1,16 s | 0,067 s |
+
+**Reste à faire (hors failles)** : ne charger en mémoire que les N dernières entrées du journal et paginer `/admin/journal` en SQL. Passer à `Session.journal` la page bornée. Calculer `/admin` et `/admin/gestion` en une passe (ils appellent encore `catalogue()` deux fois, mais chaque appel est désormais linéaire).
+
+Suite complète après corrections (`uv run --system-certs pytest -q -p no:cacheprovider`) : **418 passed**, 0 xfailed.
