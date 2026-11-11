@@ -1,5 +1,8 @@
 import re
 
+# N° de carte : « A » et trois chiffres ASCII (pas de « A١٢٣ ») (Z7).
+FORMAT_NUMERO = re.compile(r"A[0-9]{3}")
+
 
 class Adherent:
 
@@ -37,7 +40,7 @@ class Adherent:
 
     @staticmethod
     def valider_numero(numero):
-        return re.fullmatch(r"A\d{3}", numero) is not None
+        return isinstance(numero, str) and FORMAT_NUMERO.fullmatch(numero) is not None
 
     @classmethod
     def from_csv_row(cls, row):

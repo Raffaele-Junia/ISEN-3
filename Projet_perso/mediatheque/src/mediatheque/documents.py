@@ -5,7 +5,10 @@ import re
 CHAMPS_FICHE = ("genre", "themes", "resume", "editeur", "pages", "isbn", "public", "realisateur")
 PUBLICS = ("", "tout public", "jeunesse", "ado", "adulte")
 _LONGUEURS_MAX = {"genre": 60, "resume": 1200, "editeur": 80, "public": 20, "realisateur": 80}
-_FORMAT_ISBN = re.compile(r"(97[89])?\d{9}[\dX]")
+_FORMAT_ISBN = re.compile(r"(97[89])?[0-9]{9}[0-9X]")
+# N° d'inventaire : chiffres ASCII seulement (pas de « D١٢٣ ») et longueur bornee,
+# la meme regle que les routes du site et le script des couvertures (Z7).
+FORMAT_ID_DOCUMENT = re.compile(r"D[0-9]{1,6}")
 
 
 class Document(ABC):

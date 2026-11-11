@@ -413,8 +413,6 @@ def test_z6_connexion_notee_une_seule_fois_par_session(web_db):
 
 
 # ================================================================ Z7 (Basse)
-@pytest.mark.xfail(strict=True, reason="faille Z7 : le n° d'inventaire accepte les chiffres "
-                   "Unicode et n'a pas de longueur maximale")
 @pytest.mark.parametrize("ident", ["D١٢٣", "D" + "1" * 50])
 def test_z7_numero_d_inventaire_ascii_et_borne(web_db, ident):
     m = Mediatheque.charger(web_db)
@@ -424,10 +422,29 @@ def test_z7_numero_d_inventaire_ascii_et_borne(web_db, ident):
     assert ident not in m
 
 
-@pytest.mark.xfail(strict=True, reason="faille Z7 : le n° de carte accepte les chiffres Unicode")
 def test_z7_numero_de_carte_ascii():
     with pytest.raises(ValueError):
         Adherent("A١٢٣", "Nom", "Prenom", "standard")
+
+
+@pytest.mark.parametrize("url,champs", [
+    ("/admin/documents", {"type": "livre", "id": "D" + "1" * 50, "titre": "T", "annee": "2000",
+                          "extra": "Auteur"}),
+    ("/admin/documents", {"type": "livre", "id": "D١٢٣", "titre": "T", "annee": "2000",
+                          "extra": "Auteur"}),
+    ("/admin/documents", {"type": "livre", "id": "D777", "titre": "T", "annee": "２０００",
+                          "extra": "Auteur"}),
+    ("/admin/adherents", {"numero": "A١٢٣", "nom": "Nom", "prenom": "P", "type": "standard",
+                          "identifiant": "nouveau.compte", "mot_de_passe": "Secret456"}),
+])
+def test_z7_identifiant_refuse_avant_toute_modification(web_app, web_admin, web_db, url, champs):
+    avant = _etat_base(web_db), len(web_app.extensions["mediatheque"])
+    r = poster(web_admin, url, page="/connexion", **champs)
+    assert r.status_code == 302
+    page = web_admin.get(r.headers["Location"], follow_redirects=True).get_data(as_text=True)
+    assert "invalide" in page or "nombre" in page  # message en francais, pas une ValueError
+    assert "trop long" not in page
+    assert (_etat_base(web_db), len(web_app.extensions["mediatheque"])) == avant
 
 
 # ======================================================= journal : points sains

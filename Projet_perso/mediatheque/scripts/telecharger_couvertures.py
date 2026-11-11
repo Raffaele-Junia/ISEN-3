@@ -12,7 +12,6 @@
 """
 import argparse
 import json
-import re
 import sys
 import time
 import urllib.error
@@ -20,6 +19,7 @@ import urllib.parse
 import urllib.request
 from pathlib import Path
 
+from mediatheque.documents import FORMAT_ID_DOCUMENT
 from mediatheque.mediatheque import Mediatheque
 
 RACINE = Path(__file__).resolve().parent.parent
@@ -32,7 +32,7 @@ PAUSE_S = 0.4
 DUREE_MAX_S = 30
 # Seuls ces domaines (et leurs sous-domaines) sont contactes, en HTTPS (F4).
 HOTES_AUTORISES = ("openlibrary.org", "archive.org")
-_FORMAT_ID = re.compile(r"D\d{1,6}")
+_FORMAT_ID = FORMAT_ID_DOCUMENT  # D + 1 a 6 chiffres ASCII (Z7)
 
 
 def url_autorisee(url):

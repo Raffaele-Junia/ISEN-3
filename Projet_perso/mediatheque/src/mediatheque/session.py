@@ -15,15 +15,12 @@ from copy import copy
 from datetime import date
 from functools import wraps
 
-from .adherents import Adherent
+from .adherents import FORMAT_NUMERO, Adherent
 from .auth import ADHERENT, RESPONSABLE
-from .documents import CHAMPS_FICHE, Document
+from .documents import CHAMPS_FICHE, FORMAT_ID_DOCUMENT, Document
 from . import recommandations
 from .exceptions import AccesRefuseError, DocumentInconnuError, MediathequeError
 from .rapports import retards, top_emprunteurs
-
-
-_FORMAT_ID_DOCUMENT = re.compile(r"D\d+")
 
 
 def _sans_accents(texte):
@@ -329,10 +326,12 @@ class Session:
     @responsable_requis
     def ajouter_document(self, type_doc, id_document, titre, annee, extra, **fiche):
         """`fiche` : genre, themes, resume, editeur, pages, isbn, public (optionnels)."""
-        if not isinstance(id_document, str) or not _FORMAT_ID_DOCUMENT.fullmatch(id_document):
+        if not isinstance(id_document, str) or not FORMAT_ID_DOCUMENT.fullmatch(id_document):
             raise MediathequeError(
-                f"N° d'inventaire invalide : {id_document!r} (attendu : D suivi de chiffres, ex. D137).")
-        if not str(annee).strip().isdigit():
+                f"N° d'inventaire invalide : {id_document[:20]!r} (attendu : D suivi de 1 à 6 "
+                f"chiffres, ex. D137)." if isinstance(id_document, str)
+                else "N° d'inventaire invalide (attendu : D suivi de 1 à 6 chiffres, ex. D137).")
+        if not re.fullmatch(r"[0-9]+", str(annee).strip()):
             raise MediathequeError("L'année doit être un nombre, par exemple 2024.")
         try:
             document = Document.from_csv_row({"id": id_document, "type": type_doc,
@@ -367,6 +366,9 @@ class Session:
                          identifiant=None, mot_de_passe=None):
         """Avec `identifiant`, cree aussi son compte adherent. Tout est valide
         AVANT la premiere modification (W4) : pas d'adherent cree sans compte."""
+        if not isinstance(numero, str) or not FORMAT_NUMERO.fullmatch(numero):  # Z7
+            raise MediathequeError("N° de carte invalide (attendu : A suivi de 3 chiffres, "
+                                   "ex. A012).")
         adherent = Adherent(numero, nom, prenom, type_adherent)  # valide
         if identifiant:
             self._m.comptes.verifier_nouveau(identifiant, mot_de_passe or "")

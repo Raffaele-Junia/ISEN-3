@@ -32,6 +32,8 @@ from markupsafe import Markup
 
 from ..exceptions import AuthentificationError, MediathequeError
 from ..mediatheque import Mediatheque
+from ..adherents import FORMAT_NUMERO
+from ..documents import FORMAT_ID_DOCUMENT
 from ..journal import ACTIONS as ACTIONS_JOURNAL
 from ..reservation import MAX_RESERVATIONS
 from ..session import ouvrir_session
@@ -80,7 +82,7 @@ def couverture(doc):
     """Chemin static/ de la vraie couverture si elle a ete telechargee, sinon None
     (le gabarit dessine alors la couverture typographique)."""
     nom = f"{doc.id}.jpg"
-    if re.fullmatch(r"D\d{1,6}\.jpg", nom) and (DOSSIER_COUVERTURES / nom).is_file():
+    if FORMAT_ID_DOCUMENT.fullmatch(doc.id) and (DOSSIER_COUVERTURES / nom).is_file():
         return f"couvertures/{nom}"
     return None
 
@@ -455,7 +457,7 @@ def create_app(db, secret_key=None, testing=False, *,
     @app.get("/document/<id_document>")
     @connexion_requise
     def document(id_document):
-        if not re.fullmatch(r"D\d{1,6}", id_document):
+        if not FORMAT_ID_DOCUMENT.fullmatch(id_document):
             abort(404)
         try:
             f = g.s.fiche(id_document)
@@ -561,7 +563,7 @@ def create_app(db, secret_key=None, testing=False, *,
 
     def trouver_lecteur(saisie):
         code = _code(saisie)
-        if re.fullmatch(r"A\d{3}", code):
+        if FORMAT_NUMERO.fullmatch(code):
             return code
         mots = _sans_accents(saisie).split()
         trouves = [a for a in g.s.adherents()
@@ -571,7 +573,7 @@ def create_app(db, secret_key=None, testing=False, *,
 
     def trouver_document(saisie, seulement_sortis=False):
         code = _code(saisie)
-        if re.fullmatch(r"D\d{1,6}", code):
+        if FORMAT_ID_DOCUMENT.fullmatch(code):
             return code
         candidats = [d for d, st in g.s.catalogue(saisie.strip()[:100])
                      if not seulement_sortis or st == "emprunte"]
@@ -676,7 +678,7 @@ def create_app(db, secret_key=None, testing=False, *,
                                        request.form["mot_de_passe"])
         flash("Mot de passe réinitialisé.", "ok")
         retour = request.form.get("retour", "")
-        if re.fullmatch(r"A\d{3}", retour):  # depuis la fiche lecteur
+        if FORMAT_NUMERO.fullmatch(retour):  # depuis la fiche lecteur
             return redirect(url_for("admin_lecteur", numero=retour))
         return redirect(url_for("gestion", onglet="adherents"))
 
@@ -696,7 +698,7 @@ def create_app(db, secret_key=None, testing=False, *,
     @app.get("/admin/lecteurs/<numero>")
     @responsable_requis
     def admin_lecteur(numero):
-        if not re.fullmatch(r"A\d{3}", numero):
+        if not FORMAT_NUMERO.fullmatch(numero):
             abort(404)
         try:
             f = g.s.fiche_lecteur(numero)
@@ -804,7 +806,7 @@ def _code(saisie):
 
 
 def _prochain(prefixe, existants):
-    nums = [int(x[1:]) for x in existants if x[1:].isdigit()]
+    nums = [int(x[1:]) for x in existants if re.fullmatch(r"[0-9]+", x[1:])]  # ASCII (Z7)
     return f"{prefixe}{max(nums, default=0) + 1:03d}"
 
 
