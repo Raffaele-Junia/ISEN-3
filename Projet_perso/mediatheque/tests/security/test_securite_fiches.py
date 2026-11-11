@@ -449,9 +449,14 @@ def test_f5_themes_identiques_apres_rechargement(web_app, web_admin):
     poster(web_admin, "/admin/documents", page="/admin/gestion", type="livre", id="D053",
            titre="T", annee="2000", extra="A", themes="science|fiction, polar")
     m = web_app.extensions["mediatheque"]
-    avant = m["D053"].themes                      # ('science|fiction', 'polar')
-    apres = Mediatheque.charger(m._source)["D053"].themes  # ('science', 'fiction', 'polar')
-    assert apres == avant
+    # corrige (F5) : un theme contenant le separateur est refuse, rien n'est cree
+    assert "D053" not in m
+    assert "D053" not in Mediatheque.charger(m._source)
+    poster(web_admin, "/admin/documents", page="/admin/gestion", type="livre", id="D054",
+           titre="T", annee="2000", extra="A", themes="science  fiction,\n polar")
+    avant = m["D054"].themes                      # blancs et retours normalises
+    assert avant == ("science fiction", "polar")
+    assert Mediatheque.charger(m._source)["D054"].themes == avant
 
 
 # ======================================================== deni de service (F2)
