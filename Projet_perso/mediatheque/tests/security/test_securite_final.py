@@ -309,8 +309,6 @@ def test_z4_session_refuse_le_retour_pour_un_autre_lecteur(web_db):
 
 
 # ================================================================ Z5 (Basse)
-@pytest.mark.xfail(strict=True, reason="faille Z5 : Session.adherents() renvoie les Adherent "
-                   "du modele : modification sans journal, persistee a la sauvegarde")
 def test_z5_adherents_renvoie_des_copies(web_db):
     m = Mediatheque.charger(web_db)
     s = ouvrir_session(m, "admin", MDP)
@@ -319,14 +317,69 @@ def test_z5_adherents_renvoie_des_copies(web_db):
     assert m.adherent("A001").type == "standard"
 
 
-@pytest.mark.xfail(strict=True, reason="faille Z5 : Session.reserver() renvoie la Reservation "
-                   "du modele : un adherent la reaffecte a un autre numero")
 def test_z5_reservation_renvoyee_a_l_adherent_est_une_copie(web_db):
     m = Mediatheque.charger(web_db)
     lea = ouvrir_session(m, "lea", MDP)
     r = lea.reserver("D003")
     r.numero_adherent = "A003"
     assert m.reservations_de("A003") == []
+
+
+def _objets_vivants(m):
+    return {id(x) for x in (*m, *m.adherents, *m.emprunts, *m.reservations)}
+
+
+def _objets_renvoyes(valeur):
+    """Tous les objets du modele contenus dans une valeur renvoyee."""
+    if isinstance(valeur, dict):
+        for v in valeur.values():
+            yield from _objets_renvoyes(v)
+    elif isinstance(valeur, (list, tuple)):
+        for v in valeur:
+            yield from _objets_renvoyes(v)
+    elif valeur is not None and not isinstance(valeur, (str, int, float, date)):
+        yield valeur
+
+
+def test_z5_aucune_methode_de_session_ne_renvoie_un_objet_vivant(web_db):
+    """Architecture : chaque methode publique de Session est appelee, et rien de
+    ce qu'elle renvoie n'est un objet du modele (document, adherent, pret,
+    reservation). Toute nouvelle methode doit etre ajoutee a ce scenario."""
+    import inspect
+    m = Mediatheque.charger(web_db)
+    admin = ouvrir_session(m, "admin", MDP)
+    lea = ouvrir_session(m, "lea", MDP)
+    aujourdhui = date.today() + timedelta(days=60)  # D001 et D004 de Lea en retard
+    appels = [
+        ("catalogue", lea, ()), ("compteurs", lea, ()), ("publics", lea, ()),
+        ("genres", lea, ()), ("fiche", admin, ("D003",)), ("similaires", lea, ("D001",)),
+        ("pour_moi", lea, ()), ("file_attente", lea, ("D003",)), ("mon_compte", lea, ()),
+        ("reserver", lea, ("D003",)), ("annuler_reservation", lea, ("D003",)),
+        ("adherents", admin, ()),
+        ("ajouter_document", admin, ("livre", "D006", "Titre", "2000", "Auteur")),
+        ("supprimer_document", admin, ("D006",)),
+        ("ajouter_adherent", admin, ("A004", "Neuf", "Lecteur", "standard")),
+        ("creer_compte", admin, ("neuf", "Secret456", "adherent", "A004")),
+        ("reinitialiser_mot_de_passe", admin, ("neuf", "Secret789")),
+        ("enregistrer_emprunt", admin, ("D005", "A003")),
+        ("enregistrer_retour", admin, ("D005",)),
+        ("fiche_lecteur", admin, ("A001",)), ("modifier_lecteur", admin, ("A001", "Martin",
+                                                                          "Lea", "standard")),
+        ("reserver", admin, ("D003", "A001")), ("enregistrer_retour", admin, ("D003",)),
+        ("mis_de_cote_pour", admin, ("D003",)),
+        ("annuler_reservation_pour", admin, ("D003", "A001")),
+        ("journal", admin, ()), ("retards", admin, (aujourdhui,)), ("statistiques", admin, ()),
+        ("sauvegarder", admin, ()), ("changer_mot_de_passe", lea, (MDP, "Nouveau456")),
+    ]
+    publiques = {n for n, _ in inspect.getmembers(Session, inspect.isfunction)
+                 if not n.startswith("_")} - {"fermer"}
+    assert publiques <= {nom for nom, _, _ in appels}, publiques - {n for n, _, _ in appels}
+    for nom, s, args in appels:
+        avant = _objets_vivants(m)  # un objet retire (supprimer_document) compte aussi
+        renvoyes = list(_objets_renvoyes(getattr(s, nom)(*args)))
+        vivants = avant | _objets_vivants(m)  # et un objet cree par l'appel (reserver)
+        assert not [x for x in renvoyes if id(x) in vivants], nom
+    assert any(r[0].id_document == "D001" for r in admin.retards(aujourdhui))
 
 
 # ================================================================ Z6 (Basse)

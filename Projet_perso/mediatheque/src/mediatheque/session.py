@@ -5,8 +5,9 @@ metier. Masquer un bouton dans l'interface ne suffit jamais.
 - adherent    : consulte le catalogue et SON compte, reserve / annule pour LUI.
 - responsable : tout, y compris agir pour un adherent donne.
 
-Les objets renvoyes (documents, adherent) sont des COPIES : les modifier n'a
-aucun effet sur l'etat metier. Le compte de la session est immuable.
+Les objets renvoyes (documents, adherents, emprunts, reservations) sont des
+COPIES : les modifier n'a aucun effet sur l'etat metier (Z5). Les comptes et
+les entrees du journal sont immuables (frozen).
 """
 import re
 import unicodedata
@@ -298,13 +299,13 @@ class Session:
 
     @connexion_requise
     def reserver(self, id_document, numero=None, jour=None):
-        return self._m.reserver(id_document, self._numero_cible(numero),
-                                self._jour(jour))
+        return copy(self._m.reserver(id_document, self._numero_cible(numero),
+                                     self._jour(jour)))
 
     @connexion_requise
     def annuler_reservation(self, id_document, numero=None, jour=None):
-        return self._m.annuler_reservation(id_document, self._numero_cible(numero),
-                                           self._jour(jour))
+        return copy(self._m.annuler_reservation(id_document, self._numero_cible(numero),
+                                                self._jour(jour)))
 
     @connexion_requise
     def changer_mot_de_passe(self, ancien, nouveau):
@@ -336,17 +337,17 @@ class Session:
             raise MediathequeError(f"Fiche invalide : {e}.") from None
         self._m.ajouter_document(document)
         self._noter("ajout_document", document.id, f"« {document.titre} » ({document.TYPE})")
-        return document
+        return copy(document)
 
     @responsable_requis
     def supprimer_document(self, id_document):
         d = self._m.supprimer_document(id_document)
         self._noter("retrait_document", d.id, f"« {d.titre} »")
-        return d
+        return copy(d)
 
     @responsable_requis
     def adherents(self):
-        return self._m.adherents
+        return tuple(copy(a) for a in self._m.adherents)  # copies (Z5)
 
     @responsable_requis
     def ajouter_adherent(self, numero, nom, prenom, type_adherent,
@@ -361,7 +362,7 @@ class Session:
         if identifiant:
             c = self._m.creer_compte(identifiant, mot_de_passe, ADHERENT, numero)
             self._noter("creation_compte", c.identifiant, f"compte lecteur de {numero}")
-        return adherent
+        return copy(adherent)
 
     @responsable_requis
     def creer_compte(self, identifiant, mot_de_passe, role, numero_adherent=None):
@@ -382,7 +383,7 @@ class Session:
         e = self._m.emprunter(id_document, numero, jour)
         self._noter("pret", e.id_document,
                     f"« {self._m[e.id_document].titre} » à {self._m.adherent(numero).nom_complet} ({numero})")
-        return e
+        return copy(e)
 
     @responsable_requis
     def enregistrer_retour(self, id_document, jour=None, numero=None):
@@ -395,7 +396,7 @@ class Session:
         e = self._m.retourner(id_document, jour)
         self._noter("retour", e.id_document,
                     f"« {self._m[e.id_document].titre} », rendu par {e.numero_adherent}")
-        return e
+        return copy(e)
 
     @responsable_requis
     def fiche_lecteur(self, numero, aujourdhui=None):
@@ -429,7 +430,7 @@ class Session:
         r = self._m.annuler_reservation(id_document, self._numero_cible(numero))
         self._noter("annul_reservation", id_document,
                     f"« {self._m[id_document].titre} » pour {numero}")
-        return r
+        return copy(r)
 
     @responsable_requis
     def journal(self, page=1, par_page=50, action=None):
@@ -446,7 +447,7 @@ class Session:
 
     @responsable_requis
     def retards(self, aujourdhui=None):
-        return list(retards(self._m, aujourdhui or date.today()))
+        return [(copy(e), copy(d), j) for e, d, j in retards(self._m, aujourdhui or date.today())]
 
     @responsable_requis
     def statistiques(self, n=5):

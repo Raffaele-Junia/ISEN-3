@@ -61,21 +61,23 @@ def test_responsable_ne_cible_pas_un_numero_inexistant(admin):
 
 
 # --------------------------------------------- S1 : date imposee par l'appelant
-def _mise_de_cote_pour_lea(admin, lea, hugo):
+def _mise_de_cote_pour_lea(mc, admin, lea, hugo):
     """D001 emprunte par A003, reserve par lea puis hugo, rendu aujourd'hui :
-    il est mis de cote pour lea pendant 3 jours."""
+    il est mis de cote pour lea pendant 3 jours. Renvoie la reservation du
+    modele (Session ne renvoie que des copies depuis Z5)."""
     aujourdhui = date.today()
     admin.enregistrer_emprunt("D001", "A003", aujourdhui - timedelta(days=1))
     admin.enregistrer_emprunt("D002", "A003", aujourdhui - timedelta(days=1))
-    resa_lea = lea.reserver("D001")  # un adherent ne choisit pas la date (S1)
+    lea.reserver("D001")  # un adherent ne choisit pas la date (S1)
+    resa_lea, = (r for r in mc.reservations_de("A001") if r.id_document == "D001")
     hugo.reserver("D001")
     admin.enregistrer_retour("D001", aujourdhui)
     assert resa_lea.statut == DISPONIBLE
     return resa_lea
 
 
-def test_s1_adherent_ne_fait_pas_expirer_la_reservation_d_un_autre(admin, lea, hugo):
-    resa_lea = _mise_de_cote_pour_lea(admin, lea, hugo)
+def test_s1_adherent_ne_fait_pas_expirer_la_reservation_d_un_autre(mc, admin, lea, hugo):
+    resa_lea = _mise_de_cote_pour_lea(mc, admin, lea, hugo)
     try:
         hugo.mon_compte(aujourdhui=date.today() + timedelta(days=365))
     except AccesRefuseError:
@@ -83,8 +85,8 @@ def test_s1_adherent_ne_fait_pas_expirer_la_reservation_d_un_autre(admin, lea, h
     assert resa_lea.statut == DISPONIBLE
 
 
-def test_s1_reserver_avec_date_future_sans_effet_sur_les_autres(admin, lea, hugo):
-    resa_lea = _mise_de_cote_pour_lea(admin, lea, hugo)
+def test_s1_reserver_avec_date_future_sans_effet_sur_les_autres(mc, admin, lea, hugo):
+    resa_lea = _mise_de_cote_pour_lea(mc, admin, lea, hugo)
     try:
         hugo.reserver("D002", jour=date.today() + timedelta(days=365))
     except (AccesRefuseError, MediathequeError):
