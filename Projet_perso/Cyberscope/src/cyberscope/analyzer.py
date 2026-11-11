@@ -1,63 +1,108 @@
+"""Point d'entrée unique : analyse un lien et renvoie un rapport complet.
 
-from typing import Any
+Utilisé à l'identique par l'interface web, l'API JSON et la ligne de commande.
+"""
 
-from . import api_client
+import logging
+from concurrent.futures import ThreadPoolExecutor
+from datetime import datetime, timezone
+from typing import Any, Callable
+from urllib.parse import urlparse
+
+from .checks import add_signal, failed, finalize, new_check
+from .destination_analysis import check_destination
+from .domain_analysis import check_domain
+from .link_analysis import check_link
+from .net import registrable_domain
+from .reputation import check_reputation
+from .scoring import build_verdict
+from .tls_analysis import check_tls
+
+logger = logging.getLogger(__name__)
+
+# Ordre d'affichage : du signal le plus parlant au plus technique.
+DISPLAY_ORDER = ("link", "domain", "reputation", "destination", "tls")
+
+TITLES = {
+    "link": "Imitation de marque",
+    "domain": "Âge du domaine",
+    "reputation": "Réputation",
+    "destination": "Destination réelle",
+    "tls": "Connexion chiffrée",
+}
 
 
-def analyze_url(url: str) -> dict[str, Any]:
-    """Récupère le rapport VirusTotal d'une URL.
-
-    Args:
-        url: URL à analyser.
-
-    Returns:
-        Les données retournées par VirusTotal.
-
-    Raises:
-        RuntimeError: Si la requête échoue.
-    """
+def _safe(check_id: str, function: Callable[..., dict], *args: Any) -> dict[str, Any]:
+    """Un contrôle qui plante ne doit jamais faire tomber toute l'analyse."""
     try:
-        return api_client.get_url_analysis(url)
-    except api_client.VirusTotalError as e:
-        raise RuntimeError(
-            f"Erreur lors de l'analyse de l'URL : {e}"
-        ) from e
+        return function(*args)
+    except Exception:
+        logger.exception("Le contrôle %s a échoué", check_id)
+        return failed(check_id, TITLES[check_id], "Erreur inattendue pendant ce contrôle.")
 
 
-def display_analyse(url: str) -> None:
-    """Affiche les statistiques du rapport VirusTotal."""
-    try:
-        result = analyze_url(url)
+def anatomy(url: str) -> dict[str, str]:
+    """Découpe l'URL pour montrer à l'utilisateur quel est le vrai site."""
+    parsed = urlparse(url)
+    hostname = parsed.hostname or ""
+    domain = registrable_domain(hostname)
+    netloc = parsed.netloc
+    host_start = netloc.lower().find(hostname)
+    before_host = netloc[:host_start] if host_start > 0 else ""
+    after_host = netloc[host_start + len(hostname):] if host_start >= 0 else ""
+    subdomain = hostname[: -len(domain)] if hostname.endswith(domain) else ""
 
-        data = result.get("data", {})
-        attributes = data.get("attributes", {})
-        stats = attributes.get("last_analysis_stats", {})
+    rest = parsed.path or ""
+    if parsed.query:
+        rest += "?" + parsed.query
+    if parsed.fragment:
+        rest += "#" + parsed.fragment
 
-        if not stats:
-            print(f"\nAucune statistique d'analyse disponible pour : {url}")
-            print("Le rapport peut être absent ou ne pas contenir ces données.")
-            return
+    return {
+        "scheme": parsed.scheme + "://",
+        "userinfo": before_host,
+        "subdomain": subdomain,
+        "domain": domain,
+        "port": after_host,
+        "rest": rest,
+    }
 
-        malicious = stats.get("malicious", 0)
-        suspicious = stats.get("suspicious", 0)
-        harmless = stats.get("harmless", 0)
-        undetected = stats.get("undetected", 0)
 
-        print(f"\nAnalyse de : {url}")
-        print("-" * 40)
-        print(f"Malveillants : {malicious}")
-        print(f"Suspects     : {suspicious}")
-        print(f"Inoffensifs  : {harmless}")
-        print(f"Non détectés : {undetected}")
+def _combo(destination: dict, domain: dict, link: dict) -> dict[str, Any]:
+    """Signaux qui ne deviennent graves qu'ensemble."""
+    check = new_check("combo", "Recoupement")
+    if destination.get("has_password_form"):
+        if (link["risk"] or 0) >= 50:
+            add_signal(check, "La page demande un mot de passe tout en imitant une marque.", 90)
+        elif (domain["risk"] or 0) >= 35:
+            add_signal(check, "La page demande un mot de passe sur un domaine tout récent.", 80)
+    return finalize(check)
 
-        if malicious > 0:
-            print("\nATTENTION : des moteurs signalent cette URL comme malveillante.")
-        elif suspicious > 0:
-            print("\nPrudence : des moteurs signalent cette URL comme suspecte.")
-        else:
-            print("\nAucune détection malveillante ou suspecte dans ces statistiques.")
 
-        print("\nCes résultats ne garantissent pas que l'URL est sûre.")
+def analyze(url: str) -> dict[str, Any]:
+    hostname = urlparse(url).hostname or ""
 
-    except RuntimeError as e:
-        print(f"\nErreur : {e}")
+    with ThreadPoolExecutor(max_workers=4) as pool:
+        futures = {
+            "reputation": pool.submit(_safe, "reputation", check_reputation, url, hostname),
+            "domain": pool.submit(_safe, "domain", check_domain, hostname),
+            "destination": pool.submit(_safe, "destination", check_destination, url),
+            "tls": pool.submit(_safe, "tls", check_tls, url),
+        }
+        results = {key: future.result() for key, future in futures.items()}
+
+    final_url = results["destination"].get("final_url") or url
+    results["link"] = _safe("link", check_link, url, final_url)
+
+    checks = [results[key] for key in DISPLAY_ORDER]
+    combo = _combo(results["destination"], results["domain"], results["link"])
+    verdict = build_verdict(checks + [combo])
+
+    return {
+        "url": url,
+        "final_url": final_url,
+        "anatomy": anatomy(url),
+        "checked_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        "verdict": verdict,
+        "checks": checks,
+    }

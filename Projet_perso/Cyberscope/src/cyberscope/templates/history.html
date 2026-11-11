@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% set active = "history" %}
+
+{% block title %}Historique · CyberScope{% endblock %}
+
+{% block content %}
+<section class="compact">
+    <h1>Liens déjà vérifiés</h1>
+
+    {% if analyses %}
+    <ul class="legend" aria-label="Légende">
+        <li><span class="dot safe"></span>Aucun signal inquiétant</li>
+        <li><span class="dot caution"></span>Prudence</li>
+        <li><span class="dot danger"></span>Lien dangereux</li>
+    </ul>
+
+    <ul class="history-list">
+        {% for item in analyses %}
+        {% set a = anatomy(item.url) %}
+        <li>
+            <a href="/analyses/{{ item.id }}">
+                <span class="dot {{ item.verdict }}" title="{{ verdict_labels[item.verdict] }}"></span>
+                <span class="history-url" title="{{ item.url }}">{{ a.userinfo }}{{ a.subdomain }}<b>{{ a.domain }}</b>{{ a.port }}{{ a.rest }}</span>
+                <span class="history-score">{{ item.risk_score }}/100</span>
+                <span class="history-date">{{ item.created_at | relative_date }}</span>
+            </a>
+        </li>
+        {% endfor %}
+    </ul>
+    {% else %}
+    <div class="empty">
+        <p>Aucun lien vérifié pour l'instant. Chaque analyse s'enregistre ici pour que tu puisses retrouver son rapport.</p>
+        <a class="button" href="/">Vérifier un lien</a>
+    </div>
+    {% endif %}
+</section>
+{% endblock %}
