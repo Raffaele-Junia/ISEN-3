@@ -73,7 +73,8 @@ Plan détaillé et priorités : `docs/RAPPORT_SITUATION.md`. **Mettre à jour la
 - Recommandations : « Dans la même veine » exige un lien de contenu (`LIEN_CONTENU_MIN`). Les co-emprunts ne sont qu'un bonus (0,8 par lecteur). Bonus `POIDS_MEME_SUPPORT` quand le genre et le support sont les mêmes.
 - 343 tests au total.
 - [x] README (captures dans `docs/captures/`, sans couverture protégée)
-- [ ] P3 : journalisation des actions du responsable, pagination, audit final
+- [x] Journal des actions du personnel (`journal.py`, table `journal`, page `/admin/journal`), fiche lecteur `/admin/lecteurs/<n>` (voir les emprunts, retour en un clic, annuler une réservation pour le lecteur, changer la formule ou le nom, réinitialiser le mot de passe), catalogue paginé par 24. 353 tests.
+- [ ] Audit de sécurité final (journal, fiche lecteur, pagination)
 
 ## Règles de travail
 - Ne jamais modifier `data/` pendant les tests ou les démos : utiliser `tmp_path` ou une copie.

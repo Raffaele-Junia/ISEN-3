@@ -18,6 +18,8 @@ Projet personnel réalisé en 3ᵉ année à l'ISEN. Il est parti d'un petit mod
 - **Banque de prêt** : enregistrer un prêt ou un retour en tapant le n°, le nom ou le titre. Le site indique pour qui mettre de côté un document réservé.
 - **Retards** et export CSV, statistiques des plus gros lecteurs.
 - **Fonds et lecteurs** : acquisitions avec leur fiche (genre, thèmes, résumé), retrait d'un document (avec confirmation), inscription d'un lecteur et de son compte en ligne, réinitialisation d'un mot de passe.
+- **Fiche de chaque lecteur** : ce qu'il a chez lui (retour en un clic), ses réservations (annulables pour lui), tout son historique et son compte en ligne. On peut changer sa formule ou corriger son nom sans se connecter à son compte.
+- **Journal** : chaque action du personnel est tracée (qui, quoi, quand). Le journal ne peut être ni modifié ni effacé, et il ne contient jamais de mot de passe.
 - L'**historique des prêts** d'un document n'est visible que du personnel.
 
 | Connexion | Fiche d'un document |
@@ -66,6 +68,7 @@ src/mediatheque/
 ├── mediatheque.py        moteur métier : prêts, retours, réservations, cohérence
 ├── auth.py               comptes, hachage scrypt, délai après échecs
 ├── session.py            SEULE porte d'entrée de l'interface : contrôle des rôles
+├── journal.py            journal des actions du personnel (ajout seul)
 ├── recommandations.py    ressemblance (genre, thèmes, auteur) + co-emprunts anonymisés
 ├── stockage.py, stockage_sqlite.py   CSV et SQLite (transactions, migration automatique)
 └── web/                  site Flask : app.py, templates/, static/
@@ -99,7 +102,7 @@ Le projet a passé trois audits (`docs/securite/`). Les 19 failles trouvées son
 uv run pytest -q -p no:cacheprovider
 ```
 
-La suite compte 343 tests : modèle, réservations, stockage, comptes et rôles, site web, recommandations, et les tests de sécurité de `tests/security/`. L'option `-p no:cacheprovider` évite un conflit avec OneDrive.
+La suite compte 353 tests : modèle, réservations, stockage, comptes et rôles, site web, recommandations, et les tests de sécurité de `tests/security/`. L'option `-p no:cacheprovider` évite un conflit avec OneDrive.
 
 ## Méthode : les agents Claude du projet
 
