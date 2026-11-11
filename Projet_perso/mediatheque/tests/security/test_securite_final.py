@@ -370,6 +370,7 @@ def test_z5_aucune_methode_de_session_ne_renvoie_un_objet_vivant(web_db):
         ("annuler_reservation_pour", admin, ("D003", "A001")),
         ("journal", admin, ()), ("retards", admin, (aujourdhui,)), ("statistiques", admin, ()),
         ("sauvegarder", admin, ()), ("changer_mot_de_passe", lea, (MDP, "Nouveau456")),
+        ("noter_connexion", admin, ()),
     ]
     publiques = {n for n, _ in inspect.getmembers(Session, inspect.isfunction)
                  if not n.startswith("_")} - {"fermer"}
@@ -383,8 +384,6 @@ def test_z5_aucune_methode_de_session_ne_renvoie_un_objet_vivant(web_db):
 
 
 # ================================================================ Z6 (Basse)
-@pytest.mark.xfail(strict=True, reason="faille Z6 : la connexion du personnel est journalisee "
-                   "hors du verrou global (course avec recharger/sauvegarder)")
 def test_z6_connexion_du_personnel_journalisee_sous_verrou(web_app, monkeypatch):
     m = web_app.extensions["mediatheque"]
     verrou = variable_interne(web_app, "verrou")
@@ -397,6 +396,20 @@ def test_z6_connexion_du_personnel_journalisee_sous_verrou(web_app, monkeypatch)
     monkeypatch.setattr(m, "journaliser", journaliser)
     assert connecter(web_app.test_client(), "admin").status_code == 302
     assert tenu == [True]
+
+
+def test_z6_connexion_notee_une_seule_fois_par_session(web_db):
+    from mediatheque.exceptions import AccesRefuseError
+    m = Mediatheque.charger(web_db)
+    admin = ouvrir_session(m, "admin", MDP)
+    admin.noter_connexion()  # deja notee par ouvrir_session : rien de plus
+    assert [j.action for j in m.journal] == ["connexion"]
+    sans = ouvrir_session(m, "admin", MDP, noter_connexion=False)
+    assert len(m.journal) == 1
+    sans.noter_connexion()
+    assert len(m.journal) == 2
+    with pytest.raises(AccesRefuseError):
+        ouvrir_session(m, "lea", MDP).noter_connexion()
 
 
 # ================================================================ Z7 (Basse)

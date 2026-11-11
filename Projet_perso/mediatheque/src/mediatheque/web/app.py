@@ -365,7 +365,8 @@ def create_app(db, secret_key=None, testing=False, *,
                 # scrypt HORS du verrou global (W1), sous le semaphore
                 with emplacement_hachage():
                     s = ouvrir_session(m, identifiant,
-                                       request.form.get("mot_de_passe", "")[:256])
+                                       request.form.get("mot_de_passe", "")[:256],
+                                       noter_connexion=False)  # notee sous verrou (Z6)
             except AuthentificationError as e:
                 erreur = str(e)
             except BaseException:  # 503 (sature) : la tentative n'a pas eu lieu
@@ -376,10 +377,15 @@ def create_app(db, secret_key=None, testing=False, *,
                 ancien = session.pop("jeton", None)
                 session.clear()  # nouvelle session : evite la fixation de session
                 with verrou:  # registre partage entre les threads
+                    if s.est_responsable:  # la connexion du personnel est journalisee
+                        try:               # sous le verrou et ecrite tout de suite (Z6)
+                            s.noter_connexion()
+                            m.sauvegarder()
+                        except BaseException:
+                            m.recharger()  # comme `action` : memoire = base
+                            raise
                     retirer(ancien)
                     session["jeton"] = enregistrer(s)
-                    if s.est_responsable:  # la connexion du personnel est journalisee :
-                        m.sauvegarder()    # on l'ecrit tout de suite
                 session["csrf"] = secrets.token_urlsafe(32)
                 return redirect(url_for("accueil"))
         else:

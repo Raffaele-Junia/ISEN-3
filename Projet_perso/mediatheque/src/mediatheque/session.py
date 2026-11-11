@@ -71,11 +71,16 @@ def _variantes(mot):
 _JETON = object()  # seul ouvrir_session peut construire une Session (S4)
 
 
-def ouvrir_session(mediatheque, identifiant, mot_de_passe):
+def ouvrir_session(mediatheque, identifiant, mot_de_passe, noter_connexion=True):
+    """Authentifie et ouvre une session. La connexion du personnel est
+    journalisee aussitot, sauf avec `noter_connexion=False` : l'appelant qui
+    authentifie hors de son verrou (site web, W1) la note ensuite lui-meme,
+    sous ce verrou, avec `Session.noter_connexion()` (Z6)."""
     compte = mediatheque.comptes.authentifier(identifiant, mot_de_passe)
-    if compte.role == RESPONSABLE:  # tracer les connexions du personnel
-        mediatheque.journaliser(compte.identifiant, "connexion")
-    return Session(mediatheque, compte, _jeton=_JETON)
+    s = Session(mediatheque, compte, _jeton=_JETON)
+    if noter_connexion and compte.role == RESPONSABLE:  # tracer le personnel
+        s.noter_connexion()
+    return s
 
 
 def responsable_requis(methode):
@@ -104,6 +109,7 @@ class Session:
         self._m = mediatheque
         self._compte = compte
         self._ouverte = True
+        self._connexion_notee = False
 
     @property
     def compte(self):
@@ -313,6 +319,13 @@ class Session:
             self.compte.identifiant, ancien, nouveau)
 
     # ------------------------------------------------------------ responsable
+    @responsable_requis
+    def noter_connexion(self):
+        """Inscrit la connexion de ce responsable au journal, une seule fois par session."""
+        if not self._connexion_notee:
+            self._connexion_notee = True
+            self._noter("connexion")
+
     @responsable_requis
     def ajouter_document(self, type_doc, id_document, titre, annee, extra, **fiche):
         """`fiche` : genre, themes, resume, editeur, pages, isbn, public (optionnels)."""
