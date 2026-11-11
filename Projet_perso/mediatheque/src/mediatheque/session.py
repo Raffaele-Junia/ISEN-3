@@ -385,7 +385,13 @@ class Session:
         return e
 
     @responsable_requis
-    def enregistrer_retour(self, id_document, jour=None):
+    def enregistrer_retour(self, id_document, jour=None, numero=None):
+        """Avec `numero` (retour depuis la fiche d'un lecteur), refuse si le pret
+        en cours n'est pas chez ce lecteur : page perimee, double clic (Z4)."""
+        if numero is not None:
+            en_cours = self._m._emprunt_en_cours(id_document)
+            if en_cours is not None and en_cours.numero_adherent != numero:
+                raise MediathequeError("Ce document n'est pas chez ce lecteur.")
         e = self._m.retourner(id_document, jour)
         self._noter("retour", e.id_document,
                     f"« {self._m[e.id_document].titre} », rendu par {e.numero_adherent}")

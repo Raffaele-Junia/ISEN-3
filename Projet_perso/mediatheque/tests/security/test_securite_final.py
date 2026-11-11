@@ -286,14 +286,26 @@ def test_z3_purge_jamais_automatique(base_avec_journal):
 
 
 # ================================================================ Z4 (Basse)
-@pytest.mark.xfail(strict=True, reason="faille Z4 : /admin/lecteurs/<numero>/retour/<id> "
-                   "ignore <numero> et clot le pret d'un autre lecteur")
 def test_z4_retour_depuis_la_fiche_verifie_le_lecteur(web_app, web_admin, web_db):
     # D003 est chez Hugo (A002), pas chez Lea (A001) : page perimee ou formulaire modifie
     poster(web_admin, "/admin/lecteurs/A001/retour/D003", page="/connexion")
     m = Mediatheque.charger(web_db)
     assert m._emprunt_en_cours("D003") is not None
     assert m._emprunt_en_cours("D003").numero_adherent == "A002"
+
+
+def test_z4_retour_depuis_la_fiche_du_bon_lecteur(web_app, web_admin, web_db):
+    poster(web_admin, "/admin/lecteurs/A002/retour/D003", page="/connexion")
+    assert Mediatheque.charger(web_db)._emprunt_en_cours("D003") is None
+
+
+def test_z4_session_refuse_le_retour_pour_un_autre_lecteur(web_db):
+    m = Mediatheque.charger(web_db)
+    s = ouvrir_session(m, "admin", MDP)
+    with pytest.raises(MediathequeError, match="pas chez ce lecteur"):
+        s.enregistrer_retour("D003", numero="A001")
+    assert m._emprunt_en_cours("D003").numero_adherent == "A002"
+    assert not [j for j in m.journal if j.action == "retour"]
 
 
 # ================================================================ Z5 (Basse)

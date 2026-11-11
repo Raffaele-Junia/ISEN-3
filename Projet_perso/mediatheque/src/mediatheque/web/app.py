@@ -721,7 +721,7 @@ def create_app(db, secret_key=None, testing=False, *,
     @responsable_requis
     @action
     def admin_retour_pour(numero, id_document):
-        e = g.s.enregistrer_retour(id_document)
+        e = g.s.enregistrer_retour(id_document, numero=numero)  # Z4
         message = "Retour enregistré."
         pour = g.s.mis_de_cote_pour(e.id_document)
         if pour is not None:
