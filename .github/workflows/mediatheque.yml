@@ -1,0 +1,45 @@
+name: Médiathèque — tests
+
+# Lance la suite de tests de la médiathèque à chaque push ou pull request
+# qui touche le projet (les autres dossiers du dépôt ne déclenchent rien).
+on:
+  push:
+    branches: [main]
+    paths:
+      - "Projet_perso/mediatheque/**"
+      - ".github/workflows/mediatheque.yml"
+  pull_request:
+    paths:
+      - "Projet_perso/mediatheque/**"
+      - ".github/workflows/mediatheque.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mediatheque-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  tests:
+    name: pytest (Python 3.14)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: Projet_perso/mediatheque
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Installer uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+          cache-dependency-glob: Projet_perso/mediatheque/uv.lock
+
+      - name: Installer Python et les dépendances (versions figées par uv.lock)
+        run: uv sync --locked
+
+      - name: Lancer les tests
+        run: uv run pytest -q

@@ -1,5 +1,7 @@
 # Médiathèque des Tilleuls
 
+[![Tests](https://github.com/Raffaele-Junia/ISEN-3/actions/workflows/mediatheque.yml/badge.svg)](https://github.com/Raffaele-Junia/ISEN-3/actions/workflows/mediatheque.yml) ![Python 3.14](https://img.shields.io/badge/python-3.14-1E4A38) ![Flask](https://img.shields.io/badge/flask-3.1-1E4A38)
+
 Application web de gestion de médiathèque, écrite en Python avec Flask. Les lecteurs y parcourent les rayonnages, consultent leur carte et réservent ce qui est sorti. Le personnel y gère la banque de prêt, le fonds et les lecteurs.
 
 Projet personnel réalisé en 3ᵉ année à l'ISEN. Il est parti d'un petit modèle objet en console et a été étendu palier par palier : base SQLite, comptes et rôles, réservations, site web, fiches, recommandations. Chaque palier s'est accompagné d'audits de sécurité et de tests utilisateurs simulés.
@@ -81,7 +83,7 @@ Le principe clé : **les vues n'appellent que `Session`**, qui vérifie le rôle
 
 ## Sécurité
 
-Le projet a passé trois audits (`docs/securite/`). Les 19 failles trouvées sont toutes corrigées, et chacune est verrouillée par un test.
+Le projet a passé quatre audits (`docs/securite/`). Les 26 failles trouvées sont toutes corrigées, et chacune est verrouillée par un test.
 
 - **Mots de passe :** scrypt (N=2¹⁷), un sel par compte, comparaison en temps constant, même message que l'identifiant existe ou non, délai progressif après plusieurs échecs, limite par adresse IP.
 - **Web :**
@@ -102,7 +104,7 @@ Le projet a passé trois audits (`docs/securite/`). Les 19 failles trouvées son
 uv run pytest -q -p no:cacheprovider
 ```
 
-La suite compte 353 tests : modèle, réservations, stockage, comptes et rôles, site web, recommandations, et les tests de sécurité de `tests/security/`. L'option `-p no:cacheprovider` évite un conflit avec OneDrive.
+La suite compte 418 tests : modèle, réservations, stockage, comptes et rôles, site web, recommandations, et les tests de sécurité de `tests/security/`. L'option `-p no:cacheprovider` évite un conflit avec OneDrive.
 
 ## Méthode : les agents Claude du projet
 
