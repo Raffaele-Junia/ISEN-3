@@ -66,16 +66,12 @@ def _retrograder_hugo(app):
     assert r.status_code == 302
 
 
-@pytest.mark.xfail(strict=True, reason="faille Z1 : passer en standard un lecteur qui a plus "
-                   "de 3 documents enregistre une base que charger() refuse (quota depasse)")
 def test_z1_retrogradation_garde_la_base_lisible(hugo_cinq_prets):
     app = create_app(hugo_cinq_prets, secret_key="t", testing=True)
     _retrograder_hugo(app)
     Mediatheque.charger(hugo_cinq_prets)  # redemarrage du site : ne doit pas lever
 
 
-@pytest.mark.xfail(strict=True, reason="faille Z1 : apres la retrogradation, toute erreur "
-                   "metier fait echouer m.recharger() et donne une 500")
 def test_z1_erreur_suivante_reste_un_message(hugo_cinq_prets):
     app = create_app(hugo_cinq_prets, secret_key="t", testing=False)
     _retrograder_hugo(app)

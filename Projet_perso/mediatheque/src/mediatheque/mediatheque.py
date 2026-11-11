@@ -3,6 +3,7 @@ from datetime import date, datetime
 from pathlib import Path
 
 from . import stockage_sqlite
+from .adherents import Adherent
 from .auth import ADHERENT, GestionComptes
 from .emprunt import Emprunt
 from .journal import EntreeJournal
@@ -52,6 +53,14 @@ class Mediatheque:
             raise MediathequeError("Nom et prénom sont obligatoires (60 caractères au plus).")
         changements = []
         if type_adherent != a.type:
+            nouveau_quota = Adherent.QUOTAS.get(type_adherent)
+            en_cours = len(self.emprunts_de(numero))
+            # Z1 : la base doit rester coherente (jamais plus de prets que le quota)
+            if nouveau_quota is not None and en_cours > nouveau_quota:
+                raise MediathequeError(
+                    f"Impossible de passer en {type_adherent} : ce lecteur a {en_cours} documents "
+                    f"chez lui, pour {nouveau_quota} au plus. Enregistrez d'abord "
+                    f"{en_cours - nouveau_quota} retour{'s' if en_cours - nouveau_quota > 1 else ''}.")
             ancien = a.type
             a.type = type_adherent  # le setter refuse une formule inconnue
             changements.append(f"formule {ancien} → {type_adherent}")

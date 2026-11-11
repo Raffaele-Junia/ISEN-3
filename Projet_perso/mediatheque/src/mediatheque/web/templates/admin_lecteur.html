@@ -96,7 +96,7 @@
             <option value="standard" {% if a.type == 'standard' %}selected{% endif %}>Standard — 3 documents</option>
             <option value="premium" {% if a.type == 'premium' %}selected{% endif %}>Premium — 6 documents</option>
           </select>
-          {% if a.type == 'premium' and f.emprunts|length > 3 %}<span class="aide">En passant en standard, il garde ses {{ f.emprunts|length }} documents mais ne pourra plus en emprunter avant d'en rendre.</span>{% endif %}
+          {% if a.type == 'premium' and f.emprunts|length > 3 %}<span class="aide">Pour passer en standard, il doit d'abord rendre {{ f.emprunts|length - 3 }} document{{ 's' if f.emprunts|length - 3 > 1 }} (3 au plus en standard).</span>{% endif %}
         </div>
         <button class="btn plein" type="submit">Enregistrer</button>
       </form>
