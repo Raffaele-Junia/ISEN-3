@@ -17,6 +17,7 @@ import os
 import re
 import secrets
 import threading
+import unicodedata
 import time
 from collections import deque
 from contextlib import contextmanager
@@ -35,7 +36,7 @@ from ..reservation import MAX_RESERVATIONS
 from ..session import ouvrir_session
 
 TYPES = [("livre", "Livre"), ("dvd", "Film (DVD)"), ("revue", "Presse")]
-PUBLICS = {"jeunesse": "Enfants", "ado": "Ados", "tout public": "Tout public", "adulte": "Adultes"}
+PUBLICS = {"jeunesse": "Enfants", "ado": "Ados", "adulte": "Adultes", "tout public": "Tout public"}
 LIBELLE_EXTRA = {"livre": "Auteur", "dvd": "Durée (min)", "revue": "Numéro"}
 
 NOM_MEDIATHEQUE = os.environ.get("MEDIATHEQUE_NOM", "Médiathèque des Tilleuls")
@@ -81,6 +82,15 @@ def couverture(doc):
     if re.fullmatch(r"D\d{1,6}\.jpg", nom) and (DOSSIER_COUVERTURES / nom).is_file():
         return f"couvertures/{nom}"
     return None
+
+
+MOIS_LONGS = ["janvier", "février", "mars", "avril", "mai", "juin", "juillet", "août",
+              "septembre", "octobre", "novembre", "décembre"]
+
+
+def date_phrase(d):
+    """Date pour une phrase : « 2 décembre » (pas d'abréviation, donc pas de « .. »)."""
+    return f"{'1er' if d.day == 1 else d.day} {MOIS_LONGS[d.month - 1]}" if d else ""
 
 
 def date_courte(d):
@@ -329,6 +339,7 @@ def create_app(db, secret_key=None, testing=False, *,
 
     app.add_template_filter(date_courte, "court")
     app.add_template_filter(date_longue, "long")
+    app.add_template_filter(date_phrase, "jour")
 
     # --------------------------------------------------------- connexion
     @app.get("/")
@@ -391,19 +402,22 @@ def create_app(db, secret_key=None, testing=False, *,
         type_doc = request.args.get("type") or None
         if type_doc not in (None, *dict(TYPES)):
             type_doc = None
-        genres = g.s.genres()
-        genre = request.args.get("genre") or None
-        if genre not in {nom for nom, _ in genres}:
-            genre = None
-        publics = [(cle, PUBLICS[cle], nb) for cle, nb in g.s.publics() if cle in PUBLICS]
         public = request.args.get("public") or None
         if public not in PUBLICS:
             public = None
+        # N4 : seuls les genres presents pour le type et le public choisis
+        genres = g.s.genres(type_doc, public)
+        genre = request.args.get("genre") or None
+        if genre not in {nom for nom, _ in genres}:
+            genre = None
+        nb_publics = dict(g.s.publics())
+        publics = [(cle, libelle, nb_publics[cle]) for cle, libelle in PUBLICS.items()
+                   if cle in nb_publics]
         tous = g.s.catalogue()
         resultats = g.s.catalogue(texte, type_doc, genre, public)
         return render_template(
             "catalogue.html", lignes=lignes_etagere(resultats), texte=texte, type_doc=type_doc,
-            genre=genre, genres=genres, public=public, publics=publics,
+            genre=genre, genres=genres, public=public, publics=publics, PUBLICS=PUBLICS,
             total=len(tous), dispo=sum(1 for _, st in tous if st == "disponible"))
 
     def mes_documents():
@@ -519,23 +533,55 @@ def create_app(db, secret_key=None, testing=False, *,
             sortis=[d for d, st in catalogue_complet if st == "emprunte"],
             onglet=request.args.get("onglet", "emprunt"))
 
+    # ---- guichet : saisie libre (n°, nom ou titre) -> identifiant (N2)
+    def _choisir(saisie, trouves, nature, decrire, code_attendu):
+        if len(trouves) == 1:
+            return trouves[0]
+        if not trouves:
+            raise MediathequeError(f"Aucun {nature} ne correspond à « {saisie.strip()[:60]} ».")
+        liste = ", ".join(decrire(x) for x in trouves[:5])
+        suite = "…" if len(trouves) > 5 else ""
+        raise MediathequeError(f"Plusieurs {nature}s correspondent : {liste}{suite}. "
+                               f"Précisez le {code_attendu}.")
+
+    def trouver_lecteur(saisie):
+        code = _code(saisie)
+        if re.fullmatch(r"A\d{3}", code):
+            return code
+        mots = _sans_accents(saisie).split()
+        trouves = [a for a in g.s.adherents()
+                   if mots and all(m in _sans_accents(f"{a.prenom} {a.nom}") for m in mots)]
+        return _choisir(saisie, trouves, "lecteur",
+                        lambda a: f"{a.nom_complet} ({a.numero})", "n° de carte").numero
+
+    def trouver_document(saisie, seulement_sortis=False):
+        code = _code(saisie)
+        if re.fullmatch(r"D\d{1,6}", code):
+            return code
+        candidats = [d for d, st in g.s.catalogue(saisie.strip()[:100])
+                     if not seulement_sortis or st == "emprunte"]
+        exacts = [d for d in candidats if _sans_accents(d.titre) == _sans_accents(saisie.strip())]
+        return _choisir(saisie, exacts or candidats, "document",
+                        lambda d: f"« {d.titre} » ({d.id})", "n° d'inventaire").id
+
     @app.post("/admin/emprunt")
     @responsable_requis
     @action
     def admin_emprunt():
-        e = g.s.enregistrer_emprunt(_code(request.form["id_document"]),
-                                    _code(request.form["numero"]))
+        e = g.s.enregistrer_emprunt(trouver_document(request.form["id_document"]),
+                                    trouver_lecteur(request.form["numero"]))
         d = g.s.fiche(e.id_document)["document"]
         lecteur = next(a for a in g.s.adherents() if a.numero == e.numero_adherent)
         flash(f"Prêt enregistré : « {d.titre} » pour {lecteur.nom_complet} ({lecteur.numero}), "
-              f"à rendre le {date_courte(e.date_limite(d.duree_pret_jour))}.", "ok")
+              f"à rendre le {date_phrase(e.date_limite(d.duree_pret_jour))}.", "ok")
         return redirect(url_for("tableau_de_bord"))
 
     @app.post("/admin/retour")
     @responsable_requis
     @action
     def admin_retour():
-        e = g.s.enregistrer_retour(_code(request.form["id_document"]))
+        e = g.s.enregistrer_retour(trouver_document(request.form["id_document"],
+                                                    seulement_sortis=True))
         d = g.s.fiche(e.id_document)["document"]
         message = f"Retour de « {d.titre} » enregistré."
         pour = g.s.mis_de_cote_pour(e.id_document)
@@ -653,6 +699,10 @@ def _cellule(valeur):
     """Neutralise les formules a l'ouverture dans Excel (injection CSV)."""
     texte = str(valeur)
     return "'" + texte if texte[:1] in ("=", "+", "-", "@", "\t", "\r") else texte
+
+
+def _sans_accents(texte):
+    return unicodedata.normalize("NFKD", texte).encode("ascii", "ignore").decode().lower()
 
 
 def _code(saisie):

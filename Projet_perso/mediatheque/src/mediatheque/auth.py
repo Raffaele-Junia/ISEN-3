@@ -141,7 +141,7 @@ class GestionComptes:
         identifiant = identifiant.strip().lower()
         if not _FORMAT_IDENTIFIANT.fullmatch(identifiant):
             raise MediathequeError(
-                "identifiant invalide : 3 a 32 caracteres parmi a-z 0-9 . _ -")
+                "Identifiant invalide : de 3 à 32 caractères, lettres sans accent, chiffres, point, tiret ou tiret bas.")
         if identifiant in self._comptes:
             raise MediathequeError(f"Cet identifiant est déjà pris : {identifiant}.")
         valider_mot_de_passe(mot_de_passe)

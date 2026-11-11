@@ -35,7 +35,7 @@
         <p><strong>{{ 'Il est chez vous.' if a_moi == 'Chez vous' else 'Vous êtes dans la file d\'attente.' }}</strong>
           <a href="{{ url_for('compte') }}">Voir ma carte</a></p>
       {% else %}
-        <p><strong>{{ 'Sorti' if f.statut == 'emprunte' else 'Mis de côté pour un autre lecteur' }}</strong>{% if f.retour_prevu %}{% if f.retour_prevu < aujourdhui %}, en retard (attendu le {{ f.retour_prevu|court }}){% else %}, retour prévu le {{ f.retour_prevu|court }}{% endif %}{% endif %}.
+        <p><strong>{{ 'Sorti' if f.statut == 'emprunte' else 'Mis de côté pour un autre lecteur' }}</strong>{% if f.retour_prevu %}{% if f.retour_prevu < aujourdhui %}, en retard (attendu le {{ f.retour_prevu|jour }}){% else %}, retour prévu le {{ f.retour_prevu|jour }}{% endif %}{% endif %}.
           {% if f.attente %}{{ f.attente }} personne{{ 's' if f.attente > 1 }} {{ 'l\'attendent' if f.attente > 1 else 'l\'attend' }} déjà.{% else %}Personne ne l'attend encore : vous seriez le premier.{% endif %}</p>
         {% if not s.est_responsable %}
           {% if resa_pleines %}

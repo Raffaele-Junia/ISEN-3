@@ -15,6 +15,10 @@ from .stockage import (lire_adherents, lire_documents, lire_emprunts, lire_reser
                        ecrire_reservations)
 
 
+MOIS = ["janvier", "février", "mars", "avril", "mai", "juin", "juillet", "août",
+        "septembre", "octobre", "novembre", "décembre"]
+
+
 class Mediatheque:
     """Moteur metier. Ne fait AUCUN controle d'acces : c'est le role de
     `session.Session`, seule porte d'entree autorisee pour l'interface."""
@@ -225,7 +229,7 @@ class Mediatheque:
                 limite = reservee.date_limite_retrait
                 raise DocumentIndisponibleError(titre, (
                     f"« {titre} » est mis de côté pour un autre lecteur (réservation) : "
-                    f"lui seul peut l'emprunter jusqu'au {limite.day}/{limite.month:02d}."))
+                    f"lui seul peut l'emprunter jusqu'au {limite.day} {MOIS[limite.month - 1]}."))
             raise DocumentIndisponibleError(titre)
 
         quota = self._adherents[numero].quota

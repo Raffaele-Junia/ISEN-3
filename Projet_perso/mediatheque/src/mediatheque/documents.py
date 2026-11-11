@@ -41,7 +41,7 @@ class Document(ABC):
                     valeur = valeur.split("|")
                 valeur = tuple(" ".join(t.split()).lower()[:40] for t in valeur if t and t.strip())[:8]
                 if any("|" in t for t in valeur):  # separateur de stockage (F5)
-                    raise ValueError("un theme ne peut pas contenir le caractere |")
+                    raise ValueError("un thème ne peut pas contenir le caractère « | »")
             elif cle == "pages":
                 valeur = int(valeur or 0)
                 if not 0 <= valeur <= 20000:

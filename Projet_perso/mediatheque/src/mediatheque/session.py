@@ -144,10 +144,13 @@ class Session:
         return sorted(compteur.items())
 
     @connexion_requise
-    def genres(self):
-        """Genres presents dans le fonds, avec leur nombre de documents."""
+    def genres(self, type_doc=None, public=None):
+        """Genres presents dans le fonds (pour un type et un public donnes),
+        avec leur nombre de documents."""
         compteur = {}
         for d in self._m:
+            if (type_doc and d.CLE != type_doc) or (public and d.public != public):
+                continue
             if d.genre:
                 compteur[d.genre] = compteur.get(d.genre, 0) + 1
         return sorted(compteur.items())

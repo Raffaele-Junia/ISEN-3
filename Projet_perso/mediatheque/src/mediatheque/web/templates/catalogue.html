@@ -48,20 +48,28 @@
 {% if publics %}
 <nav class="pour-qui" aria-label="Pour qui ?">
   <span class="pour-qui-titre">Pour qui&nbsp;?</span>
-  <a href="{{ url_for('catalogue', q=texte or None, type=type_doc, genre=genre) }}" {% if not public %}aria-current="true"{% endif %}>Tout le monde</a>
+  <a href="{{ url_for('catalogue', q=texte or None, type=type_doc, genre=genre) }}" {% if not public %}aria-current="true"{% endif %}>Tous les âges</a>
   {% for cle, libelle, nb in publics %}
     <a href="{{ url_for('catalogue', q=texte or None, type=type_doc, genre=genre, public=cle) }}" {% if public == cle %}aria-current="true"{% endif %}>{{ libelle }}</a>
   {% endfor %}
 </nav>
 {% endif %}
 
-{% if texte or type_doc or genre or public %}<p class="compte-resultats">{{ lignes|length }} résultat{{ 's' if lignes|length > 1 }}{% if texte %} pour « {{ texte }} »{% endif %}{% if genre %} · {{ genre }}{% endif %}</p>{% endif %}
+{% if texte or type_doc or genre or public %}
+<p class="compte-resultats">{{ lignes|length }} résultat{{ 's' if lignes|length > 1 }}{% if texte %} pour « {{ texte }} »{% endif %}
+  {%- if type_doc %} · {{ {'livre': 'livres', 'dvd': 'films', 'revue': 'presse'}[type_doc] }}{% endif %}
+  {%- if genre %} · {{ genre }}{% endif %}
+  {%- if public %} · {{ PUBLICS[public]|lower }}{% endif %}
+  {%- if (type_doc or genre or public) %} · <a href="{{ url_for('catalogue', q=texte or None) }}">retirer les filtres</a>{% endif %}</p>
+{% endif %}
 
 {% if lignes %}
 <div class="etagere">
   {% for l in lignes %}{{ et.livre(l) }}{% endfor %}
 </div>
 {% else %}
-<div class="carte"><p class="vide">Rien sur nos étagères pour cette recherche. Essayez un autre mot, ou <a href="{{ url_for('catalogue') }}">parcourez tout le fonds</a>.</p></div>
+<div class="carte"><p class="vide">Rien sur nos étagères pour cette recherche
+  {%- if (type_doc or genre or public) and texte %}, avec ces filtres. <a href="{{ url_for('catalogue', q=texte) }}">Chercher « {{ texte }} » dans tout le fonds</a>
+  {%- else %}. Essayez un autre mot, ou <a href="{{ url_for('catalogue') }}">parcourez tout le fonds</a>{% endif %}.</p></div>
 {% endif %}
 {% endblock %}

@@ -264,3 +264,23 @@ def test_recherche_sans_accents_depuis_le_site(lea):
 def test_lien_d_evitement(lea):
     page = lea.get("/catalogue").get_data(as_text=True)
     assert 'href="#contenu"' in page and 'id="contenu"' in page
+
+
+# ------------------------------------------------ second panel (N1 a N4)
+def test_guichet_par_nom_et_par_titre(admin, app):
+    post(admin, "/admin/emprunt", page="/admin", id_document="design patterns", numero="petit")
+    page = admin.get("/admin").get_data(as_text=True)
+    assert "« Design Patterns » pour Ines PETIT (A003)" in page
+    assert "décembre" in page or "novembre" in page            # date ecrite en toutes lettres
+    assert ".." not in page.split("Prêt enregistré")[1][:200]   # N1 : pas de double point
+
+
+def test_guichet_saisie_ambigue_ou_inconnue(admin):
+    post(admin, "/admin/emprunt", page="/admin", id_document="D005", numero="zzz")
+    assert "Aucun lecteur ne correspond" in admin.get("/admin").get_data(as_text=True)
+
+
+def test_compteur_annonce_les_filtres_et_propose_tout_le_fonds(lea):
+    page = lea.get("/catalogue?q=zzzz&type=dvd").get_data(as_text=True)
+    assert "films" in page and "retirer les filtres" in page
+    assert "dans tout le fonds" in page

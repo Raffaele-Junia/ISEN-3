@@ -11,7 +11,7 @@
     <span class="surtitre">Carte n° {{ a.numero }} · carte {{ a.type }} : {{ a.quota }} documents à la fois</span>
     <h1>Bonjour {{ a.prenom }}.</h1>
     <p class="chapo">
-      {% if a_retirer %}Bonne nouvelle&nbsp;: <strong>{{ a_retirer[0].document.titre }}</strong> vous attend à l'accueil jusqu'au {{ a_retirer[0].date_limite_retrait|court }}.
+      {% if a_retirer %}Bonne nouvelle&nbsp;: <strong>{{ a_retirer[0].document.titre }}</strong> vous attend à l'accueil jusqu'au {{ a_retirer[0].date_limite_retrait|jour }}.
       {% elif en_retard %}Petit rappel&nbsp;: <strong>{{ en_retard[0].document.titre }}</strong> aurait dû revenir il y a {{ en_retard[0].jours_retard }} jour{{ 's' if en_retard[0].jours_retard > 1 }}.
       {% elif nb_emp %}Vous avez {{ nb_emp }} document{{ 's' if nb_emp > 1 }} chez vous. Bonne lecture&nbsp;!
       {% else %}Rien chez vous pour l'instant. <a href="{{ url_for('catalogue') }}">Un petit tour dans les rayons&nbsp;?</a>{% endif %}
