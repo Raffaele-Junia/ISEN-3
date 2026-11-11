@@ -84,7 +84,7 @@
           {% set retards = c.emprunts|selectattr('jours_retard')|list %}
           <tr>
             <td class="mono">{{ a.numero }}</td>
-            <td><strong>{{ a.nom_complet }}</strong></td>
+            <td><strong><a href="{{ url_for('admin_lecteur', numero=a.numero) }}">{{ a.nom_complet }}</a></strong></td>
             <td>{{ a.type|capitalize }}<span class="sous mono">{{ c.emprunts|length }}/{{ a.quota }} sortis</span></td>
             <td>{% if retards %}<span class="tampon retard">{{ retards|length }} retard{{ 's' if retards|length > 1 }}</span>{% endif %}
                 {% if c.reservations %}<span class="tampon reserve">{{ c.reservations|length }} réservation{{ 's' if c.reservations|length > 1 }}</span>{% endif %}

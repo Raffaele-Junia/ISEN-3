@@ -1,10 +1,11 @@
 from collections import Counter
-from datetime import date
+from datetime import date, datetime
 from pathlib import Path
 
 from . import stockage_sqlite
 from .auth import ADHERENT, GestionComptes
 from .emprunt import Emprunt
+from .journal import EntreeJournal
 from .exceptions import (AdherentInconnuError, DocumentIndisponibleError,
                          DocumentInconnuError, QuotaDepasseError, MediathequeError,
                          ReservationImpossibleError)
@@ -29,6 +30,7 @@ class Mediatheque:
         self._emprunts = []
         self._reservations = []
         self.comptes = GestionComptes()
+        self._journal = []
         self._source = None
 
     # ------------------------------------------------------------------ ajout
@@ -41,6 +43,22 @@ class Mediatheque:
         if adherent.numero in self._adherents:
             raise MediathequeError(f"Ce n° de carte est déjà utilisé : {adherent.numero}.")
         self._adherents[adherent.numero] = adherent
+
+    def modifier_adherent(self, numero, nom, prenom, type_adherent):
+        """Corrige l'identite ou change la formule. Renvoie la liste des changements."""
+        a = self.adherent(numero)
+        nom, prenom = " ".join(str(nom).split()), " ".join(str(prenom).split())
+        if not nom or not prenom or len(nom) > 60 or len(prenom) > 60:
+            raise MediathequeError("Nom et prénom sont obligatoires (60 caractères au plus).")
+        changements = []
+        if type_adherent != a.type:
+            ancien = a.type
+            a.type = type_adherent  # le setter refuse une formule inconnue
+            changements.append(f"formule {ancien} → {type_adherent}")
+        if (nom, prenom) != (a.nom, a.prenom):
+            changements.append(f"identité {a.prenom} {a.nom} → {prenom} {nom}")
+            a.nom, a.prenom = nom, prenom
+        return changements
 
     def ajouter_emprunt(self, emprunt):
         self._verifier_references(emprunt.id_document, emprunt.numero_adherent)
@@ -108,6 +126,7 @@ class Mediatheque:
             m.ajouter_emprunt(emprunt)
         for reservation in donnees["reservations"] or ():
             m.ajouter_reservation(reservation)
+        m._journal = list(donnees.get("journal", ()))
         for compte in donnees.get("comptes", ()):
             m.ajouter_compte(compte)
         m._verifier_coherence()
@@ -144,6 +163,7 @@ class Mediatheque:
         neuf = type(self).charger(self._source)
         self._documents, self._adherents = neuf._documents, neuf._adherents
         self._emprunts, self._reservations = neuf._emprunts, neuf._reservations
+        self._journal = neuf._journal
         if self._est_sqlite(self._source):  # les CSV ne contiennent pas les comptes
             self.comptes.synchroniser(neuf.comptes)
 
@@ -155,9 +175,9 @@ class Mediatheque:
             destination.parent.mkdir(parents=True, exist_ok=True)
             stockage_sqlite.sauvegarder(destination, self._documents.values(),
                                         self._adherents.values(), self._emprunts,
-                                        self._reservations, self.comptes)
+                                        self._reservations, self.comptes, self._journal)
             return
-        if len(self.comptes):
+        if len(self.comptes) or self._journal:
             raise MediathequeError(
                 "les comptes ne peuvent etre sauvegardes qu'en SQLite (fichier .db)")
         destination.mkdir(parents=True, exist_ok=True)
@@ -166,6 +186,18 @@ class Mediatheque:
         ecrire_emprunts(destination / "emprunts.csv", self._emprunts)
         if self._reservations or (destination / "reservations.csv").exists():
             ecrire_reservations(destination / "reservations.csv", self._reservations)
+
+    # ---------------------------------------------------------------- journal
+    def journaliser(self, acteur, action, cible="", detail="", quand=None):
+        """Ajoute une entree au journal (jamais de mot de passe)."""
+        entree = EntreeJournal(quand or datetime.now().replace(microsecond=0),
+                               acteur, action, cible, detail[:300])
+        self._journal.append(entree)
+        return entree
+
+    @property
+    def journal(self):
+        return tuple(self._journal)
 
     # ----------------------------------------------------------- consultation
     @property

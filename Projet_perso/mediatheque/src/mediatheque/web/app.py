@@ -32,6 +32,7 @@ from markupsafe import Markup
 
 from ..exceptions import AuthentificationError, MediathequeError
 from ..mediatheque import Mediatheque
+from ..journal import ACTIONS as ACTIONS_JOURNAL
 from ..reservation import MAX_RESERVATIONS
 from ..session import ouvrir_session
 
@@ -377,6 +378,8 @@ def create_app(db, secret_key=None, testing=False, *,
                 with verrou:  # registre partage entre les threads
                     retirer(ancien)
                     session["jeton"] = enregistrer(s)
+                    if s.est_responsable:  # la connexion du personnel est journalisee :
+                        m.sauvegarder()    # on l'ecrit tout de suite
                 session["csrf"] = secrets.token_urlsafe(32)
                 return redirect(url_for("accueil"))
         else:
@@ -415,8 +418,14 @@ def create_app(db, secret_key=None, testing=False, *,
                    if cle in nb_publics]
         tous = g.s.catalogue()
         resultats = g.s.catalogue(texte, type_doc, genre, public)
+        pages = _pagination(_numero_de_page(), len(resultats), PAR_PAGE_CATALOGUE)
+        # seules les etageres affichees sont calculees (attente, statut du lecteur)
+        page_resultats = resultats[pages["debut"]:pages["fin"]]
+        filtres = {k: v for k, v in {"q": texte or None, "type": type_doc, "genre": genre,
+                                     "public": public}.items() if v}
         return render_template(
-            "catalogue.html", lignes=lignes_etagere(resultats), texte=texte, type_doc=type_doc,
+            "catalogue.html", lignes=lignes_etagere(page_resultats), nb_resultats=len(resultats),
+            pages=pages, filtres=filtres, texte=texte, type_doc=type_doc,
             genre=genre, genres=genres, public=public, publics=publics, PUBLICS=PUBLICS,
             total=len(tous), dispo=sum(1 for _, st in tous if st == "disponible"))
 
@@ -660,7 +669,65 @@ def create_app(db, secret_key=None, testing=False, *,
         g.s.reinitialiser_mot_de_passe(request.form["identifiant"].strip().lower(),
                                        request.form["mot_de_passe"])
         flash("Mot de passe réinitialisé.", "ok")
+        retour = request.form.get("retour", "")
+        if re.fullmatch(r"A\d{3}", retour):  # depuis la fiche lecteur
+            return redirect(url_for("admin_lecteur", numero=retour))
         return redirect(url_for("gestion", onglet="adherents"))
+
+    # ------------------------------------------------ journal et fiche lecteur
+    @app.get("/admin/journal")
+    @responsable_requis
+    def admin_journal():
+        action = request.args.get("action") or None
+        if action not in ACTIONS_JOURNAL:
+            action = None
+        page = _numero_de_page()
+        entrees, total = g.s.journal(page, PAR_PAGE_JOURNAL, action)
+        return render_template("admin_journal.html", entrees=entrees, action=action,
+                               actions=ACTIONS_JOURNAL,
+                               pages=_pagination(page, total, PAR_PAGE_JOURNAL))
+
+    @app.get("/admin/lecteurs/<numero>")
+    @responsable_requis
+    def admin_lecteur(numero):
+        if not re.fullmatch(r"A\d{3}", numero):
+            abort(404)
+        try:
+            f = g.s.fiche_lecteur(numero)
+        except MediathequeError:
+            abort(404)
+        return render_template("admin_lecteur.html", f=f, a=f["adherent"])
+
+    @app.post("/admin/lecteurs/<numero>/modifier")
+    @responsable_requis
+    @action
+    def admin_modifier_lecteur(numero):
+        fo = request.form
+        changements = g.s.modifier_lecteur(numero, fo.get("nom", ""), fo.get("prenom", ""),
+                                           fo.get("type", ""))
+        flash("Fiche mise à jour : " + " ; ".join(changements) + "." if changements
+              else "Aucun changement.", "ok")
+        return redirect(url_for("admin_lecteur", numero=numero))
+
+    @app.post("/admin/lecteurs/<numero>/annuler/<id_document>")
+    @responsable_requis
+    @action
+    def admin_annuler_pour(numero, id_document):
+        g.s.annuler_reservation_pour(id_document, numero)
+        flash("Réservation annulée.", "ok")
+        return redirect(url_for("admin_lecteur", numero=numero))
+
+    @app.post("/admin/lecteurs/<numero>/retour/<id_document>")
+    @responsable_requis
+    @action
+    def admin_retour_pour(numero, id_document):
+        e = g.s.enregistrer_retour(id_document)
+        message = "Retour enregistré."
+        pour = g.s.mis_de_cote_pour(e.id_document)
+        if pour is not None:
+            message += f" Mettez-le de côté pour {pour.nom_complet} ({pour.numero})."
+        flash(message, "ok")
+        return redirect(url_for("admin_lecteur", numero=numero))
 
     @app.errorhandler(403)
     def interdit(_):
@@ -700,6 +767,25 @@ def _cellule(valeur):
     """Neutralise les formules a l'ouverture dans Excel (injection CSV)."""
     texte = str(valeur)
     return "'" + texte if texte[:1] in ("=", "+", "-", "@", "\t", "\r") else texte
+
+
+PAR_PAGE_CATALOGUE = 24
+PAR_PAGE_JOURNAL = 50
+
+
+def _numero_de_page():
+    try:
+        return max(1, min(int(request.args.get("page", 1)), 10_000))
+    except ValueError:
+        return 1
+
+
+def _pagination(page, total, par_page):
+    """Infos de pagination pour les gabarits (page courante bornee au total)."""
+    nb_pages = max(1, -(-total // par_page))
+    page = min(page, nb_pages)
+    return {"page": page, "nb_pages": nb_pages, "total": total,
+            "debut": (page - 1) * par_page, "fin": min(page * par_page, total)}
 
 
 def _sans_accents(texte):

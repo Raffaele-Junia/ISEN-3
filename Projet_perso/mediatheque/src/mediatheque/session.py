@@ -72,6 +72,8 @@ _JETON = object()  # seul ouvrir_session peut construire une Session (S4)
 
 def ouvrir_session(mediatheque, identifiant, mot_de_passe):
     compte = mediatheque.comptes.authentifier(identifiant, mot_de_passe)
+    if compte.role == RESPONSABLE:  # tracer les connexions du personnel
+        mediatheque.journaliser(compte.identifiant, "connexion")
     return Session(mediatheque, compte, _jeton=_JETON)
 
 
@@ -140,6 +142,10 @@ class Session:
             raise MediathequeError("numero d'adherent requis")
         self._m.adherent(numero)
         return numero
+
+    def _noter(self, action, cible="", detail=""):
+        """Trace une action reussie du personnel (jamais de mot de passe)."""
+        self._m.journaliser(self.compte.identifiant, action, cible, detail)
 
     def _retour_prevu(self, id_document):
         """Date limite du pret en cours (jamais QUI l'a emprunte), ou None."""
@@ -322,11 +328,14 @@ class Session:
         except ValueError as e:
             raise MediathequeError(f"Fiche invalide : {e}.") from None
         self._m.ajouter_document(document)
+        self._noter("ajout_document", document.id, f"« {document.titre} » ({document.TYPE})")
         return document
 
     @responsable_requis
     def supprimer_document(self, id_document):
-        return self._m.supprimer_document(id_document)
+        d = self._m.supprimer_document(id_document)
+        self._noter("retrait_document", d.id, f"« {d.titre} »")
+        return d
 
     @responsable_requis
     def adherents(self):
@@ -341,27 +350,80 @@ class Session:
         if identifiant:
             self._m.comptes.verifier_nouveau(identifiant, mot_de_passe or "")
         self._m.ajouter_adherent(adherent)
+        self._noter("ajout_lecteur", numero, f"{adherent.nom_complet}, carte {type_adherent}")
         if identifiant:
-            self._m.creer_compte(identifiant, mot_de_passe, ADHERENT, numero)
+            c = self._m.creer_compte(identifiant, mot_de_passe, ADHERENT, numero)
+            self._noter("creation_compte", c.identifiant, f"compte lecteur de {numero}")
         return adherent
 
     @responsable_requis
     def creer_compte(self, identifiant, mot_de_passe, role, numero_adherent=None):
-        return self._m.creer_compte(identifiant, mot_de_passe, role, numero_adherent)
+        c = self._m.creer_compte(identifiant, mot_de_passe, role, numero_adherent)
+        self._noter("creation_compte", c.identifiant,
+                    f"compte {role}" + (f" de {numero_adherent}" if numero_adherent else ""))
+        return c
 
     @responsable_requis
     def reinitialiser_mot_de_passe(self, identifiant, nouveau):
         compte = self._m.comptes.reinitialiser_mot_de_passe(identifiant, nouveau)
+        self._noter("reinit_mdp", compte.identifiant)
         if compte.identifiant == self._compte.identifiant:
             self._compte = compte  # sa propre session reste valide
 
     @responsable_requis
     def enregistrer_emprunt(self, id_document, numero, jour=None):
-        return self._m.emprunter(id_document, numero, jour)
+        e = self._m.emprunter(id_document, numero, jour)
+        self._noter("pret", e.id_document,
+                    f"« {self._m[e.id_document].titre} » à {self._m.adherent(numero).nom_complet} ({numero})")
+        return e
 
     @responsable_requis
     def enregistrer_retour(self, id_document, jour=None):
-        return self._m.retourner(id_document, jour)
+        e = self._m.retourner(id_document, jour)
+        self._noter("retour", e.id_document,
+                    f"« {self._m[e.id_document].titre} », rendu par {e.numero_adherent}")
+        return e
+
+    @responsable_requis
+    def fiche_lecteur(self, numero, aujourdhui=None):
+        """Vue du personnel sur un lecteur : sa carte (comme mon_compte), tout son
+        historique de prets et son compte en ligne (identifiant seulement)."""
+        compte = self.mon_compte(numero, aujourdhui)
+        historique = []
+        for e in reversed(self._m.emprunts):
+            if e.numero_adherent == numero:
+                d = self._m[e.id_document]
+                historique.append({"document": copy(d), "date_emprunt": e.date_emprunt,
+                                   "date_retour": e.date_retour,
+                                   "jours_retard": e.jours_retard(d.duree_pret_jour,
+                                                                  aujourdhui or date.today())})
+        c = self._m.comptes.compte_de_adherent(numero)
+        return {**compte, "historique": historique,
+                "identifiant": c.identifiant if c else None}
+
+    @responsable_requis
+    def modifier_lecteur(self, numero, nom, prenom, type_adherent):
+        try:
+            changements = self._m.modifier_adherent(numero, nom, prenom, type_adherent)
+        except ValueError:
+            raise MediathequeError("Formule inconnue : choisissez standard ou premium.") from None
+        if changements:
+            self._noter("modif_lecteur", numero, " ; ".join(changements))
+        return changements
+
+    @responsable_requis
+    def annuler_reservation_pour(self, id_document, numero):
+        r = self._m.annuler_reservation(id_document, self._numero_cible(numero))
+        self._noter("annul_reservation", id_document,
+                    f"« {self._m[id_document].titre} » pour {numero}")
+        return r
+
+    @responsable_requis
+    def journal(self, page=1, par_page=50, action=None):
+        """Entrees du journal, des plus recentes aux plus anciennes : (entrees, total)."""
+        entrees = [j for j in reversed(self._m.journal) if not action or j.action == action]
+        page = max(1, int(page))
+        return entrees[(page - 1) * par_page: page * par_page], len(entrees)
 
     @responsable_requis
     def mis_de_cote_pour(self, id_document):

@@ -372,3 +372,11 @@ input:focus-visible, select:focus-visible, textarea:focus-visible { outline: 3px
 .quand-passer h2 { font-size: 20px; }
 .horaires-compte { border-top: 0; padding-top: 0; max-width: none; grid-template-columns: repeat(4, auto auto); gap: 4px 12px; }
 @media (max-width: 760px) { .horaires-compte { grid-template-columns: auto 1fr; } }
+
+/* Pagination */
+.pagination { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 6px; }
+.pagination a { display: inline-flex; align-items: center; justify-content: center; min-width: 44px; min-height: 44px; padding: 0 12px;
+  border: 1px solid var(--filet); border-radius: 3px; background: var(--carte); color: var(--encre-2); text-decoration: none; font-family: var(--mono); }
+.pagination a:hover { border-color: var(--encre-3); color: var(--encre); }
+.pagination a[aria-current="page"] { background: var(--encre); border-color: var(--encre); color: var(--papier); }
+.pagination span { color: var(--encre-3); padding: 0 4px; }

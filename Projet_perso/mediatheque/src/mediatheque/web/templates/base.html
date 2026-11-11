@@ -21,6 +21,7 @@
         <a href="{{ url_for('tableau_de_bord') }}" {% if request.endpoint == 'tableau_de_bord' %}aria-current="page"{% endif %}>Banque de prêt</a>
         <a href="{{ url_for('gestion') }}" {% if request.endpoint == 'gestion' %}aria-current="page"{% endif %}>Fonds &amp; lecteurs</a>
         <a href="{{ url_for('catalogue') }}" {% if request.endpoint == 'catalogue' %}aria-current="page"{% endif %}>Rayonnages</a>
+        <a href="{{ url_for('admin_journal') }}" {% if request.endpoint == 'admin_journal' %}aria-current="page"{% endif %}>Journal</a>
       {% else %}
         <a href="{{ url_for('catalogue') }}" {% if request.endpoint == 'catalogue' %}aria-current="page"{% endif %}>Les rayonnages</a>
         <a href="{{ url_for('compte') }}" {% if request.endpoint == 'compte' %}aria-current="page"{% endif %}>Ma carte</a>

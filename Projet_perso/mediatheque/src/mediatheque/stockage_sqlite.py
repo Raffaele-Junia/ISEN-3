@@ -6,12 +6,13 @@ d'erreur, la base reste dans son etat precedent (pas de corruption partielle).
 """
 import sqlite3
 from contextlib import closing
-from datetime import date
+from datetime import date, datetime
 
 from .adherents import Adherent
 from .auth import Compte
 from .documents import CHAMPS_FICHE, Document
 from .emprunt import Emprunt
+from .journal import EntreeJournal
 from .reservation import Reservation
 
 SCHEMA = """
@@ -51,6 +52,14 @@ CREATE TABLE IF NOT EXISTS reservations (
     statut           TEXT NOT NULL CHECK (statut IN
                      ('en_attente', 'disponible', 'honoree', 'annulee', 'expiree')),
     date_disponible  TEXT
+);
+CREATE TABLE IF NOT EXISTS journal (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    horodatage  TEXT NOT NULL,
+    acteur      TEXT NOT NULL,
+    action      TEXT NOT NULL,
+    cible       TEXT NOT NULL DEFAULT '',
+    detail      TEXT NOT NULL DEFAULT ''
 );
 CREATE TABLE IF NOT EXISTS comptes (
     identifiant      TEXT PRIMARY KEY,
@@ -108,13 +117,19 @@ def charger(chemin):
                           r["role"], r["numero_adherent"])
                    for r in con.execute("SELECT identifiant, hash_mdp, sel, role, "
                                         "numero_adherent FROM comptes")]
+        journal = [EntreeJournal(datetime.fromisoformat(r["horodatage"]), r["acteur"],
+                                 r["action"], r["cible"], r["detail"])
+                   for r in con.execute("SELECT horodatage, acteur, action, cible, detail "
+                                        "FROM journal ORDER BY id")]
     return {"documents": documents, "adherents": adherents, "emprunts": emprunts,
-            "reservations": reservations, "comptes": comptes}
+            "reservations": reservations, "comptes": comptes, "journal": journal}
 
 
-def sauvegarder(chemin, documents, adherents, emprunts, reservations=(), comptes=()):
+def sauvegarder(chemin, documents, adherents, emprunts, reservations=(), comptes=(),
+                journal=()):
     with closing(connecter(chemin)) as con:
         with con:  # transaction : commit si tout passe, rollback sinon
+            con.execute("DELETE FROM journal")
             con.execute("DELETE FROM comptes")
             con.execute("DELETE FROM reservations")
             con.execute("DELETE FROM emprunts")
@@ -143,6 +158,11 @@ def sauvegarder(chemin, documents, adherents, emprunts, reservations=(), comptes
                 "VALUES (?, ?, ?, ?, ?)",
                 [(c.identifiant, c.hash_mdp, c.sel, c.role, c.numero_adherent)
                  for c in comptes])
+            con.executemany(
+                "INSERT INTO journal (horodatage, acteur, action, cible, detail) "
+                "VALUES (?, ?, ?, ?, ?)",
+                [(j.horodatage.isoformat(timespec="seconds"), j.acteur, j.action, j.cible,
+                  j.detail) for j in journal])
 
 
 def _iso(d: date | None):

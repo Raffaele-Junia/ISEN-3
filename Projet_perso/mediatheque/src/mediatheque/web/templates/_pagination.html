@@ -1,0 +1,14 @@
+{# Pagination accessible : « Précédent », numéros proches, « Suivant ». #}
+{% macro pagination(p, endpoint, args) %}
+{% if p.nb_pages > 1 %}
+<nav class="pagination" aria-label="Pages">
+  {% if p.page > 1 %}<a href="{{ url_for(endpoint, page=p.page - 1, **args) }}" rel="prev">← Précédent</a>{% endif %}
+  {% for n in range(1, p.nb_pages + 1) %}
+    {% if n == 1 or n == p.nb_pages or (n - p.page)|abs <= 2 %}
+      <a href="{{ url_for(endpoint, page=n, **args) }}" {% if n == p.page %}aria-current="page"{% endif %}>{{ n }}</a>
+    {% elif (n - p.page)|abs == 3 %}<span aria-hidden="true">…</span>{% endif %}
+  {% endfor %}
+  {% if p.page < p.nb_pages %}<a href="{{ url_for(endpoint, page=p.page + 1, **args) }}" rel="next">Suivant →</a>{% endif %}
+</nav>
+{% endif %}
+{% endmacro %}

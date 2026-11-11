@@ -1,0 +1,123 @@
+{% extends "base.html" %}
+{% block titre %}{{ a.nom_complet }}{% endblock %}
+{% block contenu %}
+{% set en_retard = f.emprunts|selectattr('jours_retard')|list %}
+<nav class="fil" aria-label="Fil d'Ariane">
+  <a href="{{ url_for('gestion', onglet='adherents') }}">Les lecteurs</a><span aria-hidden="true">/</span><span>{{ a.numero }}</span>
+</nav>
+
+<div class="titre-page">
+  <div>
+    <span class="surtitre">Carte n° {{ a.numero }} · {{ a.type }} : {{ a.quota }} documents à la fois</span>
+    <h1>{{ a.prenom }} {{ a.nom|upper }}</h1>
+    <p class="chapo">
+      {{ f.emprunts|length }} document{{ 's' if f.emprunts|length > 1 }} chez lui ou elle
+      {%- if en_retard %}, dont <strong>{{ en_retard|length }} en retard</strong>{% endif %}
+      · {{ f.reservations|length }} réservation{{ 's' if f.reservations|length > 1 }}
+      · {{ f.historique|length }} prêt{{ 's' if f.historique|length > 1 }} en tout.
+    </p>
+  </div>
+</div>
+
+<div class="rangee">
+  <div class="col-large pile">
+    <section class="fiche-pret" aria-labelledby="h-emp">
+      <div class="carte-titre"><h2 id="h-emp">Chez le lecteur</h2></div>
+      {% if f.emprunts %}
+      <div class="defile">
+        <table>
+          <thead><tr><th>Document</th><th>Sorti le</th><th>Retour avant le</th><th><span class="sr">Actions</span></th></tr></thead>
+          <tbody>
+          {% for e in f.emprunts %}
+            <tr>
+              <td><strong><a href="{{ url_for('document', id_document=e.document.id) }}">{{ e.document.titre }}</a></strong><span class="sous mono">{{ cote(e.document) }} · {{ e.document.id }}</span></td>
+              <td class="date">{{ e.date_emprunt|court }}</td>
+              <td class="date">{{ e.date_limite|court }}{% if e.jours_retard %} <span class="tampon retard">{{ e.jours_retard }} j</span>{% endif %}</td>
+              <td class="actions">
+                <form method="post" action="{{ url_for('admin_retour_pour', numero=a.numero, id_document=e.document.id) }}">{{ jeton() }}
+                  <button class="btn second petit" type="submit" aria-label="Enregistrer le retour de {{ e.document.titre }}">Retour</button>
+                </form>
+              </td>
+            </tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}<p class="vide">Rien chez ce lecteur pour l'instant.</p>{% endif %}
+    </section>
+
+    <section class="carte" aria-labelledby="h-res">
+      <div class="carte-titre"><h2 id="h-res">Ses réservations</h2></div>
+      {% for r in f.reservations %}
+        <div class="ligne-resa">
+          <div class="infos"><strong>{{ r.document.titre }}</strong><span class="muted small">{{ r.document.id }} · {{ r.document.detail }}</span></div>
+          {% if r.statut == 'disponible' %}<span class="tampon ok">À retirer avant le {{ r.date_limite_retrait|court }}</span>
+          {% else %}<span class="tampon en_attente">{{ r.rang }}{{ 'er' if r.rang == 1 else 'e' }} dans la file</span>{% endif %}
+          <form method="post" action="{{ url_for('admin_annuler_pour', numero=a.numero, id_document=r.document.id) }}">{{ jeton() }}
+            <button class="btn second petit" type="submit" aria-label="Annuler la réservation de {{ r.document.titre }}">Annuler pour lui</button>
+          </form>
+        </div>
+      {% else %}
+        <p class="vide">Aucune réservation active.</p>
+      {% endfor %}
+    </section>
+
+    <section class="carte" aria-labelledby="h-histo">
+      <div class="carte-titre"><h2 id="h-histo">Historique des prêts</h2><span class="surtitre">du plus récent au plus ancien</span></div>
+      {% if f.historique %}
+      <div class="defile">
+        <table>
+          <thead><tr><th>Document</th><th>Sorti le</th><th>Rendu le</th></tr></thead>
+          <tbody>
+          {% for h in f.historique[:30] %}
+            <tr><td>{{ h.document.titre }}<span class="sous mono">{{ h.document.id }}</span></td>
+                <td class="mono">{{ h.date_emprunt|court }}</td>
+                <td class="mono">{{ h.date_retour|court if h.date_retour else 'pas encore' }}</td></tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% if f.historique|length > 30 %}<p class="vide">… et {{ f.historique|length - 30 }} prêts plus anciens.</p>{% endif %}
+      {% else %}<p class="vide">Aucun prêt pour l'instant.</p>{% endif %}
+    </section>
+  </div>
+
+  <div class="col-etroite pile">
+    <section class="carte pad" aria-labelledby="h-modif">
+      <h2 id="h-modif">Modifier la fiche</h2>
+      <form method="post" action="{{ url_for('admin_modifier_lecteur', numero=a.numero) }}" class="pile">
+        {{ jeton() }}
+        <div class="deux">
+          <div class="champ"><label for="m-prenom">Prénom</label><input id="m-prenom" name="prenom" value="{{ a.prenom }}" required maxlength="60"></div>
+          <div class="champ"><label for="m-nom">Nom</label><input id="m-nom" name="nom" value="{{ a.nom }}" required maxlength="60"></div>
+        </div>
+        <div class="champ"><label for="m-type">Formule</label>
+          <select id="m-type" name="type">
+            <option value="standard" {% if a.type == 'standard' %}selected{% endif %}>Standard — 3 documents</option>
+            <option value="premium" {% if a.type == 'premium' %}selected{% endif %}>Premium — 6 documents</option>
+          </select>
+          {% if a.type == 'premium' and f.emprunts|length > 3 %}<span class="aide">En passant en standard, il garde ses {{ f.emprunts|length }} documents mais ne pourra plus en emprunter avant d'en rendre.</span>{% endif %}
+        </div>
+        <button class="btn plein" type="submit">Enregistrer</button>
+      </form>
+    </section>
+
+    <section class="carte pad" aria-labelledby="h-compte">
+      <h2 id="h-compte">Compte en ligne</h2>
+      {% if f.identifiant %}
+        <p>Identifiant : <span class="mono">{{ f.identifiant }}</span></p>
+        <form method="post" action="{{ url_for('admin_reinitialiser') }}" class="pile">
+          {{ jeton() }}
+          <input type="hidden" name="identifiant" value="{{ f.identifiant }}">
+          <input type="hidden" name="retour" value="{{ a.numero }}">
+          <div class="champ"><label for="r-mdp">Nouveau mot de passe</label><input id="r-mdp" name="mot_de_passe" type="password" required autocomplete="new-password">
+            <span class="aide">8 caractères minimum, lettres et chiffres. Le lecteur sera déconnecté partout.</span></div>
+          <button class="btn second plein" type="submit">Réinitialiser le mot de passe</button>
+        </form>
+      {% else %}
+        <p class="muted">Ce lecteur n'a pas de compte en ligne.</p>
+      {% endif %}
+    </section>
+  </div>
+</div>
+{% endblock %}

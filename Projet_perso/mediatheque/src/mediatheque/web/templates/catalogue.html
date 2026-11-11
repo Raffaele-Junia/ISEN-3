@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% import "_etagere.html" as et with context %}
+{% import "_pagination.html" as pg %}
 {% block titre %}Les rayonnages{% endblock %}
 {% block contenu %}
 <div class="titre-page">
@@ -56,7 +57,7 @@
 {% endif %}
 
 {% if texte or type_doc or genre or public %}
-<p class="compte-resultats">{{ lignes|length }} résultat{{ 's' if lignes|length > 1 }}{% if texte %} pour « {{ texte }} »{% endif %}
+<p class="compte-resultats">{{ nb_resultats }} résultat{{ 's' if nb_resultats > 1 }}{% if texte %} pour « {{ texte }} »{% endif %}
   {%- if type_doc %} · {{ {'livre': 'livres', 'dvd': 'films', 'revue': 'presse'}[type_doc] }}{% endif %}
   {%- if genre %} · {{ genre }}{% endif %}
   {%- if public %} · {{ PUBLICS[public]|lower }}{% endif %}
@@ -67,6 +68,8 @@
 <div class="etagere">
   {% for l in lignes %}{{ et.livre(l) }}{% endfor %}
 </div>
+{% if pages.nb_pages > 1 %}<p class="compte-resultats">Documents {{ pages.debut + 1 }} à {{ pages.fin }} sur {{ pages.total }}</p>{% endif %}
+{{ pg.pagination(pages, 'catalogue', filtres) }}
 {% else %}
 <div class="carte"><p class="vide">Rien sur nos étagères pour cette recherche
   {%- if (type_doc or genre or public) and texte %}, avec ces filtres. <a href="{{ url_for('catalogue', q=texte) }}">Chercher « {{ texte }} » dans tout le fonds</a>
