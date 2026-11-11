@@ -98,8 +98,6 @@ def base_moyenne(tmp_path):
     return create_app(tmp_path / "moy.db", secret_key="t", testing=True)
 
 
-@pytest.mark.xfail(strict=True, reason="faille Z2 : GET /catalogue parcourt tous les prets "
-                   "pour chaque document (cout documents x prets) sous le verrou global")
 def test_z2_cout_du_catalogue_lineaire(base_moyenne, monkeypatch):
     lea = client_connecte(base_moyenne, "lea")
     m = base_moyenne.extensions["mediatheque"]
@@ -115,6 +113,53 @@ def test_z2_cout_du_catalogue_lineaire(base_moyenne, monkeypatch):
     assert lea.get("/catalogue").status_code == 200
     # borne lineaire : quelques passes sur les documents et sur les prets
     assert compteur[0] <= 20 * (300 + 1200), compteur[0]  # observe : ~1 400 000
+
+
+def test_z2_index_identiques_a_une_recherche_lineaire(tmp_path):
+    """Les index des prets en cours et des mises de cote donnent exactement ce
+    que donnait le parcours des listes, apres une suite d'operations au hasard,
+    une sauvegarde et un rechargement."""
+    from mediatheque.reservation import DISPONIBLE
+    rng = random.Random(7)
+    m = Mediatheque()
+    for i in range(12):
+        m.ajouter_document(Livre(f"D{i:03d}", f"T{i}", 2000, "A"))
+    for j in range(6):
+        m.ajouter_adherent(Adherent(f"A{j:03d}", "N", "P", "premium"))
+    m.sauvegarder(tmp_path / "idx.db")
+    m = Mediatheque.charger(tmp_path / "idx.db")
+
+    def verifier():
+        for d in m:
+            lin_e = next((e for e in m._emprunts if e.id_document == d.id and e.en_cours), None)
+            lin_r = next((r for r in m._reservations
+                          if r.id_document == d.id and r.statut == DISPONIBLE), None)
+            assert m._emprunt_en_cours(d.id) is lin_e
+            assert m._mise_de_cote(d.id) is lin_r
+
+    jour = date(2026, 1, 1)
+    for _ in range(600):
+        jour += timedelta(days=rng.choice((0, 0, 1, 2, 5)))
+        doc, num = f"D{rng.randrange(12):03d}", f"A{rng.randrange(6):03d}"
+        op = rng.choice(("emprunter", "retourner", "reserver", "annuler", "actualiser",
+                         "recharger"))
+        try:
+            if op == "emprunter":
+                m.emprunter(doc, num, jour)
+            elif op == "retourner":
+                m.retourner(doc, jour)
+            elif op == "reserver":
+                m.reserver(doc, num, jour)
+            elif op == "annuler":
+                m.annuler_reservation(doc, num, jour)
+            elif op == "actualiser":
+                m.actualiser_reservations(jour)
+            else:
+                m.sauvegarder()
+                m.recharger()
+        except MediathequeError:
+            pass
+        verifier()
 
 
 # =============================================================== Z3 (Moyenne)

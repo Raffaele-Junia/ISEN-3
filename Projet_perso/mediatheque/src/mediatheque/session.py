@@ -187,6 +187,13 @@ class Session:
         return resultat
 
     @connexion_requise
+    def compteurs(self):
+        """(nombre de documents, nombre disponibles pour ce lecteur) : le bandeau
+        du catalogue sans recopier tout le fonds (Z2)."""
+        dispo = sum(1 for d in self._m if self._statut(d.id) == "disponible")
+        return len(self._m), dispo
+
+    @connexion_requise
     def publics(self):
         """Publics presents dans le fonds, avec leur nombre de documents."""
         compteur = {}

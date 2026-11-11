@@ -416,8 +416,8 @@ def create_app(db, secret_key=None, testing=False, *,
         nb_publics = dict(g.s.publics())
         publics = [(cle, libelle, nb_publics[cle]) for cle, libelle in PUBLICS.items()
                    if cle in nb_publics]
-        tous = g.s.catalogue()
-        resultats = g.s.catalogue(texte, type_doc, genre, public)
+        resultats = g.s.catalogue(texte, type_doc, genre, public)  # un seul appel (Z2)
+        total, dispo = g.s.compteurs()
         pages = _pagination(_numero_de_page(), len(resultats), PAR_PAGE_CATALOGUE)
         # seules les etageres affichees sont calculees (attente, statut du lecteur)
         page_resultats = resultats[pages["debut"]:pages["fin"]]
@@ -427,7 +427,7 @@ def create_app(db, secret_key=None, testing=False, *,
             "catalogue.html", lignes=lignes_etagere(page_resultats), nb_resultats=len(resultats),
             pages=pages, filtres=filtres, texte=texte, type_doc=type_doc,
             genre=genre, genres=genres, public=public, publics=publics, PUBLICS=PUBLICS,
-            total=len(tous), dispo=sum(1 for _, st in tous if st == "disponible"))
+            total=total, dispo=dispo)
 
     def mes_documents():
         """{id: libelle} des documents que le lecteur a chez lui ou a reserves,

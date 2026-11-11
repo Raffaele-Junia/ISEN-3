@@ -30,6 +30,10 @@ class Mediatheque:
         self._adherents = {}
         self._emprunts = []
         self._reservations = []
+        # Z2 : index {id_document: Emprunt en cours} et {id_document: Reservation
+        # mise de cote}, pour que le statut d'un document se lise en O(1)
+        self._en_cours = {}
+        self._de_cote = {}
         self.comptes = GestionComptes()
         self._journal = []
         self._source = None
@@ -72,10 +76,14 @@ class Mediatheque:
     def ajouter_emprunt(self, emprunt):
         self._verifier_references(emprunt.id_document, emprunt.numero_adherent)
         self._emprunts.append(emprunt)
+        if emprunt.en_cours:  # le premier en cours fait foi, comme une recherche lineaire
+            self._en_cours.setdefault(emprunt.id_document, emprunt)
 
     def ajouter_reservation(self, reservation):
         self._verifier_references(reservation.id_document, reservation.numero_adherent)
         self._reservations.append(reservation)
+        if reservation.statut == DISPONIBLE:
+            self._de_cote.setdefault(reservation.id_document, reservation)
 
     def ajouter_compte(self, compte):
         if compte.numero_adherent is not None and compte.numero_adherent not in self._adherents:
@@ -147,8 +155,9 @@ class Mediatheque:
         en_cours = Counter(e.id_document for e in self._emprunts if e.en_cours)
         if any(n > 1 for n in en_cours.values()):
             raise MediathequeError("document emprunte deux fois simultanement")
+        par_adherent = Counter(e.numero_adherent for e in self._emprunts if e.en_cours)
         for a in self._adherents.values():
-            if len(self.emprunts_de(a.numero)) > a.quota:
+            if par_adherent[a.numero] > a.quota:
                 raise MediathequeError(f"quota depasse pour {a.numero}")
         for e in self._emprunts:
             if e.date_retour is not None and e.date_retour < e.date_emprunt:
@@ -172,6 +181,7 @@ class Mediatheque:
         neuf = type(self).charger(self._source)
         self._documents, self._adherents = neuf._documents, neuf._adherents
         self._emprunts, self._reservations = neuf._emprunts, neuf._reservations
+        self._en_cours, self._de_cote = neuf._en_cours, neuf._de_cote
         self._journal = neuf._journal
         if self._est_sqlite(self._source):  # les CSV ne contiennent pas les comptes
             self.comptes.synchroniser(neuf.comptes)
@@ -241,12 +251,20 @@ class Mediatheque:
                 if r.id_document == id_document and r.active]
 
     def _emprunt_en_cours(self, id_document):
-        return next((e for e in self._emprunts
-                     if e.id_document == id_document and e.en_cours), None)
+        """Pret en cours du document, ou None (O(1) grace a l'index, Z2)."""
+        e = self._en_cours.get(id_document)
+        if e is not None and not e.en_cours:  # rendu sans passer par retourner()
+            del self._en_cours[id_document]
+            return None
+        return e
 
     def _mise_de_cote(self, id_document):
-        return next((r for r in self._reservations
-                     if r.id_document == id_document and r.statut == DISPONIBLE), None)
+        """Reservation mise de cote pour ce document, ou None (O(1), Z2)."""
+        r = self._de_cote.get(id_document)
+        if r is not None and r.statut != DISPONIBLE:  # honoree, annulee ou expiree
+            del self._de_cote[id_document]
+            return None
+        return r
 
     def disponible(self, id_document, numero=None):
         """Libre en rayon. Un document mis de cote n'est disponible que pour
@@ -281,8 +299,10 @@ class Mediatheque:
         reservee = self._mise_de_cote(id_document)
         if reservee is not None:
             reservee.statut = HONOREE
+            del self._de_cote[id_document]
         emprunt = Emprunt(id_document, numero, jour)
         self._emprunts.append(emprunt)
+        self._en_cours[id_document] = emprunt
         return emprunt
 
     def retourner(self, id_document, date_retour=None):
@@ -292,6 +312,7 @@ class Mediatheque:
         if emprunt is None:
             raise MediathequeError(f"Ce document n'est pas sorti : rien à rendre ({id_document}).")
         emprunt.date_retour = date_retour or date.today()
+        del self._en_cours[id_document]
         self._promouvoir_suivant(id_document, emprunt.date_retour)
         return emprunt
 
@@ -312,7 +333,7 @@ class Mediatheque:
             raise ReservationImpossibleError(
                 f"Vous avez déjà {MAX_RESERVATIONS} réservations : annulez-en une pour en faire une nouvelle.")
         reservation = Reservation(id_document, numero, jour)
-        self._reservations.append(reservation)
+        self._reservations.append(reservation)  # en attente : hors de l'index _de_cote
         return reservation
 
     def annuler_reservation(self, id_document, numero, jour=None):
@@ -322,6 +343,7 @@ class Mediatheque:
                 etait_de_cote = r.statut == DISPONIBLE
                 r.statut = ANNULEE
                 if etait_de_cote:
+                    self._de_cote.pop(id_document, None)
                     self._promouvoir_suivant(id_document, jour)
                 return r
         raise ReservationImpossibleError("Vous n'avez pas de réservation pour ce document.")
@@ -331,6 +353,8 @@ class Mediatheque:
         for r in list(self._reservations):
             if r.statut == DISPONIBLE and aujourdhui > r.date_limite_retrait:
                 r.statut = EXPIREE
+                if self._de_cote.get(r.id_document) is r:
+                    del self._de_cote[r.id_document]
                 self._promouvoir_suivant(r.id_document, aujourdhui)
 
     def _promouvoir_suivant(self, id_document, jour):
@@ -340,6 +364,7 @@ class Mediatheque:
                         if r.id_document == id_document and r.statut == EN_ATTENTE), None)
         if suivant is not None:
             suivant.mettre_de_cote(jour)
+            self._de_cote[id_document] = suivant
 
     # -------------------------------------------------------------- recherche
     def rechercher(self, critere):
