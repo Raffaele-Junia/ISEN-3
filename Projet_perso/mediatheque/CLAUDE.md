@@ -67,10 +67,11 @@ Plan détaillé et priorités : `docs/RAPPORT_SITUATION.md`. **Mettre à jour la
 - [x] Recommandations (`recommandations.py`) : ressemblance (genre, thèmes, auteur, revue, époque) combinée aux co-emprunts **anonymisés** (seuil de 3 autres lecteurs). Index du fonds et cache des co-emprunts, 10 lectures récentes au plus. « Dans la même veine » sur la fiche, « Pour vous » sur Ma carte, avec une raison lisible.
 - [x] Vraies couvertures téléchargées une fois depuis Open Library (`scripts/telecharger_couvertures.py`, HTTPS et domaines autorisés, images hors git), avec repli sur la couverture typographique.
 - [x] Audit `AUDIT_2026-11-10_fiches.md` : F1–F5 corrigées.
-- [x] Agent `panel-testeurs` (6 personas). Rapport `docs/ux/PANEL_2026-11-11.md` (27 problèmes). Appliqués : B1–B4, G1–G13 (sauf G5 partiel), C1–C3 et C7–C10. Restent C4 (réalisateur des films), C5 (horaires sur Ma carte), C6 (date de retour dans « Ce que j'attends ») et la pagination du catalogue.
+- [x] Agent `panel-testeurs` (6 personas). Rapport `docs/ux/PANEL_2026-11-11.md` (27 problèmes). Appliqués : B1–B4, G1–G13 (sauf G5 partiel), C1–C3 et C7–C10. Second panel (`docs/ux/PANEL_2026-11-11_bis.md`) : la note moyenne passe de 5,7 à 7,7/10, et N1–N10 sont corrigés. C4 (champ `realisateur` des films, « Du même réalisateur »), C5 (horaires sur Ma carte, macro `_horaires.html`) et C6 (retour prévu dans « Ce que j'attends ») sont faits. Reste la pagination du catalogue.
 - Recherche du catalogue : insensible aux accents, multi-mots, dans titre, auteur, genre, thèmes, résumé, éditeur et public. Filtres combinables : type, genre (repliable `<details>`) et « Pour qui ? » (`public`).
 - Messages d'erreur métier : en français correct, avec majuscule et ponctuation, écrits à la source. Les gabarits ne les capitalisent plus.
-- 336 tests au total.
+- Recommandations : « Dans la même veine » exige un lien de contenu (`LIEN_CONTENU_MIN`). Les co-emprunts ne sont qu'un bonus (0,8 par lecteur). Bonus `POIDS_MEME_SUPPORT` quand le genre et le support sont les mêmes.
+- 343 tests au total.
 - [ ] P3 : README, journalisation, audit final
 
 ## Règles de travail

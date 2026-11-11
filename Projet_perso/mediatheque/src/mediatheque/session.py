@@ -141,6 +141,11 @@ class Session:
         self._m.adherent(numero)
         return numero
 
+    def _retour_prevu(self, id_document):
+        """Date limite du pret en cours (jamais QUI l'a emprunte), ou None."""
+        e = self._m._emprunt_en_cours(id_document)
+        return e.date_limite(self._m[id_document].duree_pret_jour) if e else None
+
     def _statut(self, id_document):
         if self._m.disponible(id_document, self.compte.numero_adherent):
             return "disponible"
@@ -168,7 +173,7 @@ class Session:
                 continue
             if mots:
                 botte = " " + _ponctuation(_sans_accents(" ".join((
-                    d.id, d.titre, str(d.detail), d.genre, d.TYPE, *d.themes, d.resume,
+                    d.id, d.titre, str(d.detail), d.createur, d.genre, d.TYPE, *d.themes, d.resume,
                     d.editeur, d.public)))) + " "
                 if not all(any(v in botte for v in variantes) for variantes in mots):
                     continue
@@ -269,6 +274,7 @@ class Session:
                 "statut": r.statut,
                 "rang": file.index(r) + 1,
                 "date_limite_retrait": r.date_limite_retrait,
+                "retour_prevu": self._retour_prevu(r.id_document),  # C6
             })
         return {
             "adherent": copy(adherent),

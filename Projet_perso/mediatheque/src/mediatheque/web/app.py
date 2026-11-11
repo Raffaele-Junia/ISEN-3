@@ -627,6 +627,7 @@ def create_app(db, secret_key=None, testing=False, *,
         d = g.s.ajouter_document(
             f["type"], f["id"].strip(), f["titre"].strip(), f["annee"].strip(), f["extra"].strip(),
             genre=f.get("genre", "").strip(), resume=f.get("resume", "").strip(),
+            realisateur=f.get("realisateur", "").strip() if f["type"] == "dvd" else "",
             themes=[t for t in f.get("themes", "").split(",")])
         flash(f"« {d.titre} » ajouté au catalogue.", "ok")
         return redirect(url_for("gestion"))

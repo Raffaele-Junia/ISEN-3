@@ -2,9 +2,9 @@ from abc import ABC, abstractmethod
 import re
 
 # Metadonnees OPTIONNELLES d'une fiche (absentes des anciens CSV / bases).
-CHAMPS_FICHE = ("genre", "themes", "resume", "editeur", "pages", "isbn", "public")
+CHAMPS_FICHE = ("genre", "themes", "resume", "editeur", "pages", "isbn", "public", "realisateur")
 PUBLICS = ("", "tout public", "jeunesse", "ado", "adulte")
-_LONGUEURS_MAX = {"genre": 60, "resume": 1200, "editeur": 80, "public": 20}
+_LONGUEURS_MAX = {"genre": 60, "resume": 1200, "editeur": 80, "public": 20, "realisateur": 80}
 _FORMAT_ISBN = re.compile(r"(97[89])?\d{9}[\dX]")
 
 
@@ -27,6 +27,7 @@ class Document(ABC):
         self.pages = 0
         self.isbn = ""
         self.public = ""
+        self.realisateur = ""
 
     def completer_fiche(self, **fiche):
         """Renseigne les metadonnees de la fiche, validees. Renvoie self."""
@@ -64,11 +65,11 @@ class Document(ABC):
         """Metadonnees de la fiche, au format de stockage (themes en 'a|b|c')."""
         return {"genre": self.genre, "themes": "|".join(self.themes), "resume": self.resume,
                 "editeur": self.editeur, "pages": self.pages, "isbn": self.isbn,
-                "public": self.public}
+                "public": self.public, "realisateur": self.realisateur}
 
     @property
     def createur(self):
-        """Auteur d'un livre ; vide sinon (utile aux recommandations)."""
+        """Auteur d'un livre, realisateur d'un film ; vide sinon (recommandations)."""
         return ""
 
     def __init_subclass__(cls, **kwargs):
@@ -176,6 +177,10 @@ class DVD(Document):
     @property
     def duree_min(self):
         return self._extra
+
+    @property
+    def createur(self):
+        return self.realisateur
 
     @property
     def duree_pret_jour(self):

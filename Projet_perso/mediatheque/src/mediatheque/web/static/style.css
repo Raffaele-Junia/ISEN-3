@@ -366,3 +366,9 @@ input:focus-visible, select:focus-visible, textarea:focus-visible { outline: 3px
 .recherche-gestion input { flex: 1 1 220px; height: 44px; font-style: normal; font-family: var(--sans); font-size: 15px; }
 .champ .aide { color: var(--encre-2); }
 @media (max-width: 420px) { .deux { grid-template-columns: 1fr; } }
+
+/* C5 : horaires sur « Ma carte » */
+.quand-passer { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px 28px; padding: 16px 20px; border: 1px dashed var(--accent); border-radius: 4px; background: var(--carte); }
+.quand-passer h2 { font-size: 20px; }
+.horaires-compte { border-top: 0; padding-top: 0; max-width: none; grid-template-columns: repeat(4, auto auto); gap: 4px 12px; }
+@media (max-width: 760px) { .horaires-compte { grid-template-columns: auto 1fr; } }

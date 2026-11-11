@@ -13,7 +13,7 @@
     <div>
       <span class="c-titre">{{ d.titre }}</span>
       <div class="c-filet"></div>
-      <span class="c-auteur">{{ d.detail }}</span>
+      <span class="c-auteur">{{ d.realisateur if d.CLE == 'dvd' and d.realisateur else d.detail }}</span>
     </div>
   {% endif %}
   <span class="etiquette">{{ cote(d) }}</span>

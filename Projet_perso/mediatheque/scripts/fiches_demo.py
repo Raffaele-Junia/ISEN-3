@@ -1114,3 +1114,39 @@ FICHES = {
 }
 
 GENRES = sorted({f["genre"] for f in FICHES.values()})
+
+# Realisateurs des films (C4 : « Du meme realisateur » sur la fiche).
+REALISATEURS = {
+    "Inception": "Christopher Nolan",
+    "Interstellar": "Christopher Nolan",
+    "Le Fabuleux Destin d'Amélie Poulain": "Jean-Pierre Jeunet",
+    "Intouchables": "Olivier Nakache et Éric Toledano",
+    "La Haine": "Mathieu Kassovitz",
+    "Les Quatre Cents Coups": "François Truffaut",
+    "À bout de souffle": "Jean-Luc Godard",
+    "Le Dîner de cons": "Francis Veber",
+    "La Cité de la peur": "Alain Berbérian",
+    "OSS 117 : Le Caire, nid d'espions": "Michel Hazanavicius",
+    "Le Voyage de Chihiro": "Hayao Miyazaki",
+    "Mon voisin Totoro": "Hayao Miyazaki",
+    "Princesse Mononoké": "Hayao Miyazaki",
+    "Parasite": "Bong Joon-ho",
+    "Pulp Fiction": "Quentin Tarantino",
+    "Le Parrain": "Francis Ford Coppola",
+    "Retour vers le futur": "Robert Zemeckis",
+    "Matrix": "Lana et Lilly Wachowski",
+    "Le Seigneur des anneaux : La Communauté de l'anneau": "Peter Jackson",
+    "Ratatouille": "Brad Bird",
+    "WALL-E": "Andrew Stanton",
+    "La La Land": "Damien Chazelle",
+    "Portrait de la jeune fille en feu": "Céline Sciamma",
+    "Anatomie d'une chute": "Justine Triet",
+    "Les Choristes": "Christophe Barratier",
+    "Le Grand Bleu": "Luc Besson",
+    "Astérix et Obélix : Mission Cléopâtre": "Alain Chabat",
+    "Shining": "Stanley Kubrick",
+    "Alien": "Ridley Scott",
+    "Blade Runner": "Ridley Scott",
+}
+for _titre, _nom in REALISATEURS.items():
+    FICHES[_titre]["realisateur"] = _nom

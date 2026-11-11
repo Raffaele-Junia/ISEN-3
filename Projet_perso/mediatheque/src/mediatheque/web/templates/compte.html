@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% import "_etagere.html" as et with context %}
+{% import "_horaires.html" as h %}
 {% block titre %}Ma carte{% endblock %}
 {% block contenu %}
 {% set a = c.adherent %}
@@ -19,6 +20,14 @@
   </div>
   <a href="#mot-de-passe" class="small">Changer mon mot de passe</a>
 </div>
+
+{% if a_retirer or en_retard %}
+<aside class="quand-passer" aria-labelledby="h-passer">
+  <h2 id="h-passer">Quand passer&nbsp;?</h2>
+  <p class="muted small">{% if a_retirer %}Pour retirer votre réservation avant le {{ a_retirer[0].date_limite_retrait|jour }}{% else %}Pour rapporter ce qui est en retard{% endif %}, la médiathèque est ouverte&nbsp;:</p>
+  {{ h.horaires("horaires horaires-compte") }}
+</aside>
+{% endif %}
 
 <div class="synthese">
   <div class="carte chiffre">
@@ -70,7 +79,8 @@
   <div class="carte-titre"><h2 id="h-res">Ce que j'attends</h2></div>
   {% for r in c.reservations %}
     <div class="ligne-resa">
-      <div class="infos"><strong>{{ r.document.titre }}</strong><span class="muted small">{{ r.document.detail }}</span></div>
+      <div class="infos"><strong>{{ r.document.titre }}</strong><span class="muted small">{{ r.document.detail }}
+        {%- if r.statut != 'disponible' and r.retour_prevu %} · {% if r.retour_prevu < aujourdhui %}en retard chez l'emprunteur (attendu le {{ r.retour_prevu|jour }}){% else %}retour prévu le {{ r.retour_prevu|jour }}{% endif %}{% endif %}</span></div>
       {% if r.statut == 'disponible' %}
         <span class="tampon ok">À retirer avant le {{ r.date_limite_retrait|court }}</span>
       {% else %}

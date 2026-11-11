@@ -17,9 +17,11 @@ POIDS_THEME = 1.5        # par theme partage
 POIDS_CREATEUR = 3.0
 POIDS_MEME_REVUE = 4.0
 POIDS_EPOQUE = 0.5
-POIDS_CO_EMPRUNT = 1.2   # par lecteur commun, plafonne
+POIDS_MEME_SUPPORT = 1.0  # film avec film, livre avec livre (a contenu egal)
+POIDS_CO_EMPRUNT = 0.8   # par lecteur commun, plafonne (un bonus, pas un lien a lui seul)
 PLAFOND_CO_EMPRUNT = 3
 SEUIL = 2.5              # en dessous, la ressemblance n'est pas montree
+LIEN_CONTENU_MIN = 1.5   # « Dans la meme veine » exige un vrai lien : genre, theme ou auteur
 SEUIL_ANONYMAT = 3       # une paire de co-emprunts ne compte qu'a partir de 3 lecteurs (F1)
 HISTORIQUE_MAX = 10      # lectures recentes prises en compte pour « Pour vous » (F2)
 
@@ -121,6 +123,8 @@ def ressemblance(a, b, co=None):
     score = 0.0
     if a.genre and a.genre == b.genre:
         score += POIDS_GENRE
+        if a.CLE == b.CLE:
+            score += POIDS_MEME_SUPPORT
     score += POIDS_THEME * len(set(a.themes) & set(b.themes))
     if a.createur and a.createur == b.createur:
         score += POIDS_CREATEUR
@@ -140,7 +144,8 @@ def similaires(m, id_document, n=6, exclure=(), co=None, numero=None):
     co = co_emprunts(m, exclure=numero) if co is None else co
     exclure = set(exclure) | {id_document}
     notes = [(ressemblance(reference, m[i], co), m[i])
-             for i in _candidats(m, reference, co) if i not in exclure]
+             for i in _candidats(m, reference, co) if i not in exclure
+             and ressemblance(reference, m[i]) >= LIEN_CONTENU_MIN]
     notes = [(s, d) for s, d in notes if s >= SEUIL]
     # a score egal : le document en rayon d'abord, puis l'ordre alphabetique
     notes.sort(key=lambda sd: (-sd[0], not m.disponible(sd[1].id), sd[1].titre))

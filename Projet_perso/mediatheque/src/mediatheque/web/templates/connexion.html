@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% import "_horaires.html" as h %}
 {% block titre %}Connexion{% endblock %}
 {% block corps %}
 <main class="accueil">
@@ -8,12 +9,7 @@
       <h1>Il reste toujours <em>un bon livre</em> à emprunter.</h1>
       <p class="chapo">Retrouvez ce que vous avez chez vous, la date à laquelle le rendre, et réservez ce que quelqu'un d'autre lit en ce moment&nbsp;: on vous le met de côté à son retour.</p>
     </div>
-    <dl class="horaires" aria-label="Horaires d'ouverture">
-      <dt>Mar · Jeu</dt><dd>14 h – 19 h</dd>
-      <dt>Mer · Sam</dt><dd>10 h – 18 h</dd>
-      <dt>Ven</dt><dd>14 h – 20 h</dd>
-      <dt>Dim · Lun</dt><dd>fermé</dd>
-    </dl>
+    {{ h.horaires() }}
   </section>
   <section class="accueil-carte">
     <div class="fiche">

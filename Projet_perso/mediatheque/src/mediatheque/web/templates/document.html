@@ -15,7 +15,7 @@
     <h1>{{ d.titre }}</h1>
     <p class="fiche-auteur">
       {% if d.CLE == 'livre' %}de <a href="{{ url_for('catalogue', q=d.auteur) }}">{{ d.auteur }}</a>
-      {% elif d.CLE == 'dvd' %}{{ d.duree_min }} minutes
+      {% elif d.CLE == 'dvd' %}{% if d.realisateur %}de <a href="{{ url_for('catalogue', q=d.realisateur) }}">{{ d.realisateur }}</a> · {% endif %}{{ d.duree_min }} minutes
       {% else %}Numéro {{ d.numero }}{% endif %}
     </p>
 
@@ -61,7 +61,7 @@
   </div>
 </article>
 
-{{ et.rangee(meme_createur, "Du même auteur", id="h-auteur") }}
+{{ et.rangee(meme_createur, "Du même réalisateur" if d.CLE == 'dvd' else "Du même auteur", id="h-auteur") }}
 {{ et.rangee(similaires, "Dans la même veine", "Choisis d'après le genre, les thèmes, et ce qu'ont aussi emprunté les lecteurs de ce titre.", id="h-veine") }}
 
 {% if f.historique %}

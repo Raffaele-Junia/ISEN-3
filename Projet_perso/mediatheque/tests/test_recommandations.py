@@ -168,3 +168,22 @@ def test_synonymes_de_recherche(mr):
     assert {d.id for d, _ in lea.catalogue("film")} == {"D004", "D005"}
     # un mot de deux lettres sans synonyme n'est cherche qu'en mot entier
     assert lea.catalogue("ar") == []
+
+
+def test_realisateur_et_meme_createur(mr):
+    from mediatheque.documents import DVD
+    mr["D004"].completer_fiche(realisateur="Lana et Lilly Wachowski")
+    mr.ajouter_document(DVD("D007", "Matrix Reloaded", 2003, 138).completer_fiche(
+        realisateur="Lana et Lilly Wachowski", genre="Science-fiction"))
+    lea = ouvrir_session(mr, "lea", MDP)
+    assert [d.id for d, _ in lea.fiche("D004")["meme_createur"]] == ["D007"]
+    assert {d.id for d, _ in lea.catalogue("wachowski")} == {"D004", "D007"}
+
+
+def test_reservation_indique_le_retour_prevu_sans_l_emprunteur(mr):
+    mr.emprunter("D001", "A002", AUJOURDHUI)
+    lea = ouvrir_session(mr, "lea", MDP)
+    lea.reserver("D001")
+    r = lea.mon_compte()["reservations"][0]
+    assert r["retour_prevu"] is not None
+    assert "A002" not in str(r) and "Durand" not in str(r)

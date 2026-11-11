@@ -27,7 +27,8 @@ CREATE TABLE IF NOT EXISTS documents (
     editeur TEXT NOT NULL DEFAULT '',
     pages   INTEGER NOT NULL DEFAULT 0,
     isbn    TEXT NOT NULL DEFAULT '',
-    public  TEXT NOT NULL DEFAULT ''
+    public  TEXT NOT NULL DEFAULT '',
+    realisateur TEXT NOT NULL DEFAULT ''
 );
 CREATE TABLE IF NOT EXISTS adherents (
     numero  TEXT PRIMARY KEY,
@@ -66,7 +67,7 @@ CREATE TABLE IF NOT EXISTS comptes (
 _COLONNES_FICHE = {"genre": "TEXT NOT NULL DEFAULT ''", "themes": "TEXT NOT NULL DEFAULT ''",
                    "resume": "TEXT NOT NULL DEFAULT ''", "editeur": "TEXT NOT NULL DEFAULT ''",
                    "pages": "INTEGER NOT NULL DEFAULT 0", "isbn": "TEXT NOT NULL DEFAULT ''",
-                   "public": "TEXT NOT NULL DEFAULT ''"}
+                   "public": "TEXT NOT NULL DEFAULT ''", "realisateur": "TEXT NOT NULL DEFAULT ''"}
 
 
 def connecter(chemin):

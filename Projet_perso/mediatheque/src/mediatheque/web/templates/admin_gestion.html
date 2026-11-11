@@ -63,6 +63,7 @@
       <div class="champ"><label for="f-titre">Titre</label><input id="f-titre" name="titre" required maxlength="200"></div>
       <div class="champ"><label for="f-extra">Auteur (livre) · durée en minutes (film) · numéro (revue)</label><input id="f-extra" name="extra" required maxlength="200">
         <span class="aide">L'auteur pour un livre, la durée en minutes pour un film, le numéro pour une revue.</span></div>
+      <div class="champ"><label for="f-real">Réalisateur (film)</label><input id="f-real" name="realisateur" maxlength="80" placeholder="ex. Agnès Varda"></div>
       <div class="champ"><label for="f-genre">Genre</label><input id="f-genre" name="genre" maxlength="60" list="liste-genres" placeholder="ex. Roman contemporain">
         <datalist id="liste-genres">{% for nom, _ in genres %}<option value="{{ nom }}"></option>{% endfor %}</datalist></div>
       <div class="champ"><label for="f-themes">Thèmes</label><input id="f-themes" name="themes" maxlength="200" placeholder="amour, guerre, enfance">
