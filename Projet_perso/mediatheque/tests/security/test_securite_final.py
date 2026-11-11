@@ -19,7 +19,7 @@ from mediatheque.adherents import Adherent
 from mediatheque.auth import ADHERENT
 from mediatheque.documents import Livre
 from mediatheque.emprunt import Emprunt
-from mediatheque.exceptions import MediathequeError
+from mediatheque.exceptions import AuthentificationError, MediathequeError
 from mediatheque.journal import EntreeJournal
 from mediatheque.mediatheque import Mediatheque
 from mediatheque.session import Session, ouvrir_session
@@ -172,8 +172,6 @@ def base_avec_journal(web_db):
     return web_db
 
 
-@pytest.mark.xfail(strict=True, reason="faille Z3 : chaque sauvegarde (meme une reservation "
-                   "d'adherent) efface et reecrit tout le journal")
 def test_z3_une_reservation_ne_reecrit_pas_le_journal(base_avec_journal):
     app = create_app(base_avec_journal, secret_key="t", testing=True)
     avant = _lignes(base_avec_journal, "journal")
@@ -183,13 +181,108 @@ def test_z3_une_reservation_ne_reecrit_pas_le_journal(base_avec_journal):
     assert _lignes(base_avec_journal, "journal") == avant  # ids et contenu inchanges
 
 
-@pytest.mark.xfail(strict=True, reason="faille Z3 : la table journal n'est pas protegee en "
-                   "ajout seul dans la base (UPDATE/DELETE acceptes)")
 @pytest.mark.parametrize("requete", ["UPDATE journal SET detail = 'falsifie'",
                                      "DELETE FROM journal"])
 def test_z3_journal_en_ajout_seul_dans_la_base(base_avec_journal, requete):
     with sqlite3.connect(base_avec_journal) as con, pytest.raises(sqlite3.DatabaseError):
         con.execute(requete)
+
+
+def test_z3_declencheurs_ajoutes_aux_bases_existantes(tmp_path):
+    """Une base creee avant le correctif (sans declencheurs) les recoit a l'ouverture."""
+    db = tmp_path / "ancienne.db"
+    with sqlite3.connect(db) as con:
+        con.execute("CREATE TABLE journal (id INTEGER PRIMARY KEY AUTOINCREMENT, horodatage "
+                    "TEXT NOT NULL, acteur TEXT NOT NULL, action TEXT NOT NULL, cible TEXT "
+                    "NOT NULL DEFAULT '', detail TEXT NOT NULL DEFAULT '')")
+        con.execute("INSERT INTO journal (horodatage, acteur, action) "
+                    "VALUES ('2026-01-01T10:00:00', 'admin', 'connexion')")
+    Mediatheque.charger(db)
+    with sqlite3.connect(db) as con, pytest.raises(sqlite3.DatabaseError):
+        con.execute("DELETE FROM journal")
+
+
+def test_z3_sauvegardes_successives_ajoutent_seulement(base_avec_journal):
+    m = Mediatheque.charger(base_avec_journal)
+    avant = _lignes(base_avec_journal, "journal")
+    m.journaliser("admin", "pret", "D002", "nouvelle")
+    m.sauvegarder()
+    m.sauvegarder()  # rien de nouveau : rien n'est ajoute
+    apres = _lignes(base_avec_journal, "journal")
+    assert apres[:len(avant)] == avant and len(apres) == len(avant) + 1
+    assert apres[-1][-1] == "nouvelle"
+
+
+def test_z3_recharger_sans_relire_un_journal_inchange(base_avec_journal, monkeypatch):
+    from mediatheque import stockage_sqlite
+    m = Mediatheque.charger(base_avec_journal)
+    lectures = [0]
+    vraie = stockage_sqlite._lire_journal
+
+    def comptee(con):
+        lectures[0] += 1
+        return vraie(con)
+
+    monkeypatch.setattr(stockage_sqlite, "_lire_journal", comptee)
+    m.journaliser("admin", "pret", "D002", "ecrite")
+    m.sauvegarder()
+    m.journaliser("admin", "pret", "D002", "perdue")  # jamais sauvegardee
+    m.recharger()
+    assert lectures[0] == 0
+    assert [j.detail for j in m.journal][-1] == "ecrite"
+    assert m.journal == Mediatheque.charger(base_avec_journal).journal
+    # la base change ailleurs (nouvelle entree) : le journal est bien relu
+    autre = Mediatheque.charger(base_avec_journal)
+    autre.journaliser("admin", "connexion")
+    autre.sauvegarder()
+    m.recharger()
+    assert lectures[0] >= 1 and m.journal[-1].action == "connexion"
+
+
+def test_z3_purge_reservee_au_responsable_et_journalisee(base_avec_journal):
+    from datetime import datetime
+    from mediatheque.exceptions import AccesRefuseError
+    from mediatheque.journal import CONSERVATION_JOURNAL_JOURS
+    from mediatheque.purge_journal import purger
+    assert CONSERVATION_JOURNAL_JOURS == 365
+    m = Mediatheque.charger(base_avec_journal)
+    vieux = datetime.now().replace(microsecond=0) - timedelta(days=400)
+    for i in range(3):
+        m.journaliser("admin", "pret", "D001", f"ancienne {i}", quand=vieux)
+    m.sauvegarder()
+    total = len(m.journal)
+    # un adherent, ou un compte qui n'est pas celui du registre : refuse
+    lea = m.comptes.authentifier("lea", MDP)
+    with pytest.raises(AccesRefuseError):
+        m.purger_journal(lea)
+    with pytest.raises(AccesRefuseError):
+        m.purger_journal(dataclasses.replace(m.comptes.get("admin")))
+    with pytest.raises(AccesRefuseError):
+        purger(base_avec_journal, "lea", MDP)  # par la commande : adherent refuse
+    with pytest.raises(AuthentificationError):
+        purger(base_avec_journal, "admin", "MauvaisMdp1")
+    assert len(_lignes(base_avec_journal, "journal")) == total
+    # le responsable purge : 3 anciennes supprimees, la purge est journalisee
+    assert purger(base_avec_journal, "admin", MDP) == 3
+    lignes = _lignes(base_avec_journal, "journal")
+    assert len(lignes) == total - 3 + 1
+    assert not any("ancienne" in l[-1] for l in lignes)
+    assert lignes[-1][2:4] == ("admin", "purge_journal")
+    # les declencheurs sont toujours en place apres la purge
+    with sqlite3.connect(base_avec_journal) as con, pytest.raises(sqlite3.DatabaseError):
+        con.execute("DELETE FROM journal")
+
+
+def test_z3_purge_jamais_automatique(base_avec_journal):
+    from datetime import datetime
+    m = Mediatheque.charger(base_avec_journal)
+    vieux = datetime.now().replace(microsecond=0) - timedelta(days=4000)
+    m.journaliser("admin", "pret", "D001", "tres ancienne", quand=vieux)
+    m.sauvegarder()
+    app = create_app(base_avec_journal, secret_key="t", testing=True)
+    client_connecte(app, "admin")
+    poster(client_connecte(app, "lea"), "/reserver/D003", page="/connexion")
+    assert any("tres ancienne" in l[-1] for l in _lignes(base_avec_journal, "journal"))
 
 
 # ================================================================ Z4 (Basse)

@@ -1,13 +1,13 @@
 from collections import Counter
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from pathlib import Path
 
 from . import stockage_sqlite
 from .adherents import Adherent
-from .auth import ADHERENT, GestionComptes
+from .auth import ADHERENT, RESPONSABLE, GestionComptes
 from .emprunt import Emprunt
-from .journal import EntreeJournal
-from .exceptions import (AdherentInconnuError, DocumentIndisponibleError,
+from .journal import CONSERVATION_JOURNAL_JOURS, EntreeJournal
+from .exceptions import (AccesRefuseError, AdherentInconnuError, DocumentIndisponibleError,
                          DocumentInconnuError, QuotaDepasseError, MediathequeError,
                          ReservationImpossibleError)
 from .reservation import (ANNULEE, DISPONIBLE, EN_ATTENTE, EXPIREE, HONOREE,
@@ -36,6 +36,10 @@ class Mediatheque:
         self._de_cote = {}
         self.comptes = GestionComptes()
         self._journal = []
+        # Z3 : nombre d'entrees de `_journal` deja ecrites dans la source, et etat
+        # (min id, max id) du journal de la base apres la derniere lecture/ecriture
+        self._journal_ecrit = 0
+        self._etat_journal = None
         self._source = None
 
     # ------------------------------------------------------------------ ajout
@@ -124,8 +128,12 @@ class Mediatheque:
     def charger(cls, source):
         """Charge depuis une base SQLite (`*.db`) ou un dossier de CSV."""
         source = Path(source)
+        return cls._construire(source, cls._lire(source))
+
+    @classmethod
+    def _lire(cls, source, journal_connu=None):
         if cls._est_sqlite(source):
-            donnees = stockage_sqlite.charger(source)
+            donnees = stockage_sqlite.charger(source, journal_connu)
         else:
             donnees = {
                 "documents": lire_documents(source / "documents.csv"),
@@ -133,6 +141,10 @@ class Mediatheque:
                 "emprunts": lire_emprunts(source / "emprunts.csv"),
                 "reservations": lire_reservations(source / "reservations.csv"),
             }
+        return donnees
+
+    @classmethod
+    def _construire(cls, source, donnees):
         m = cls()
         m._source = source
         for document in donnees["documents"]:
@@ -144,6 +156,8 @@ class Mediatheque:
         for reservation in donnees["reservations"] or ():
             m.ajouter_reservation(reservation)
         m._journal = list(donnees.get("journal", ()))
+        m._journal_ecrit = len(m._journal)
+        m._etat_journal = donnees.get("etat_journal")
         for compte in donnees.get("comptes", ()):
             m.ajouter_compte(compte)
         m._verifier_coherence()
@@ -178,11 +192,17 @@ class Mediatheque:
         (les sessions restent valides) et les compteurs d'echecs sont conserves."""
         if self._source is None:
             raise ValueError("aucune source a recharger")
-        neuf = type(self).charger(self._source)
+        donnees = self._lire(self._source, self._etat_journal)
+        if donnees.get("journal", ()) is None:
+            # journal de la base inchange depuis notre derniere ecriture (Z3) :
+            # on garde les entrees ecrites, sans relire toute la table
+            donnees["journal"] = self._journal[:self._journal_ecrit]
+        neuf = self._construire(self._source, donnees)
         self._documents, self._adherents = neuf._documents, neuf._adherents
         self._emprunts, self._reservations = neuf._emprunts, neuf._reservations
         self._en_cours, self._de_cote = neuf._en_cours, neuf._de_cote
         self._journal = neuf._journal
+        self._journal_ecrit, self._etat_journal = neuf._journal_ecrit, neuf._etat_journal
         if self._est_sqlite(self._source):  # les CSV ne contiennent pas les comptes
             self.comptes.synchroniser(neuf.comptes)
 
@@ -192,9 +212,15 @@ class Mediatheque:
             raise ValueError("aucune destination de sauvegarde indiquee")
         if self._est_sqlite(destination):
             destination.parent.mkdir(parents=True, exist_ok=True)
-            stockage_sqlite.sauvegarder(destination, self._documents.values(),
-                                        self._adherents.values(), self._emprunts,
-                                        self._reservations, self.comptes, self._journal)
+            # Z3 : vers sa propre source, seules les entrees nouvelles du journal
+            # sont ajoutees ; ailleurs, on complete ce que la base contient deja
+            source = destination == self._source
+            etat = stockage_sqlite.sauvegarder(
+                destination, self._documents.values(), self._adherents.values(),
+                self._emprunts, self._reservations, self.comptes, self._journal,
+                journal_deja_ecrit=self._journal_ecrit if source else None)
+            if source:
+                self._journal_ecrit, self._etat_journal = len(self._journal), etat
             return
         if len(self.comptes) or self._journal:
             raise MediathequeError(
@@ -217,6 +243,33 @@ class Mediatheque:
     @property
     def journal(self):
         return tuple(self._journal)
+
+    def purger_journal(self, compte, jours=CONSERVATION_JOURNAL_JOURS, maintenant=None):
+        """Supprime de la base les entrees du journal de plus de `jours` jours
+        (duree de conservation) et journalise la purge. Jamais automatique : a
+        lancer a la main (`python -m mediatheque.purge_journal`). Reservee a un
+        compte responsable authentifie (le `Compte` renvoye par `authentifier`,
+        tel qu'il est dans le registre). Renvoie le nombre d'entrees supprimees."""
+        if self.comptes.get(getattr(compte, "identifiant", None)) is not compte \
+                or compte.role != RESPONSABLE:
+            raise AccesRefuseError("purge du journal reservee a un responsable connecte")
+        if self._source is None or not self._est_sqlite(self._source):
+            raise MediathequeError("La purge du journal ne se fait que sur une base SQLite.")
+        if not isinstance(jours, int) or jours < 1:
+            raise MediathequeError("La durée de conservation doit être d'au moins un jour.")
+        maintenant = maintenant or datetime.now().replace(microsecond=0)
+        avant = maintenant - timedelta(days=jours)
+
+        def entree(n):
+            pluriel = "s" if n > 1 else ""
+            return EntreeJournal(maintenant, compte.identifiant, "purge_journal", "",
+                                 f"{n} entrée{pluriel} de plus de {jours} jours "
+                                 f"supprimée{pluriel} (avant le {avant:%d/%m/%Y})")
+
+        self.sauvegarder()  # la base contient d'abord tout ce qui est en memoire
+        n = stockage_sqlite.purger_journal(self._source, avant, entree)
+        self.recharger()    # puis la memoire reprend le journal purge
+        return n
 
     # ----------------------------------------------------------- consultation
     @property

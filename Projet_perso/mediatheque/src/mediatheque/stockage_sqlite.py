@@ -3,6 +3,11 @@
 Toutes les requetes sont parametrees (`?`) : aucune donnee n'est jamais
 concatenee dans le SQL. La sauvegarde se fait dans UNE transaction : en cas
 d'erreur, la base reste dans son etat precedent (pas de corruption partielle).
+
+Le journal est en AJOUT SEUL (Z3) : la sauvegarde n'y insere que les nouvelles
+entrees, et deux declencheurs refusent tout UPDATE ou DELETE sur la table. Seule
+`purger_journal` (duree de conservation, lancee a la main par un responsable)
+suspend celui des suppressions, le temps de sa transaction.
 """
 import sqlite3
 from contextlib import closing
@@ -70,6 +75,16 @@ CREATE TABLE IF NOT EXISTS comptes (
 );
 """
 
+# Declencheurs d'ajout seul du journal (Z3). `connecter` les cree aussi dans
+# les bases existantes ; `purger_journal` les recree apres sa suppression.
+DECLENCHEUR_MODIFICATION = (
+    "CREATE TRIGGER IF NOT EXISTS journal_sans_modification BEFORE UPDATE ON journal "
+    "BEGIN SELECT RAISE(ABORT, 'journal en ajout seul : modification interdite'); END")
+DECLENCHEUR_SUPPRESSION = (
+    "CREATE TRIGGER IF NOT EXISTS journal_sans_suppression BEFORE DELETE ON journal "
+    "BEGIN SELECT RAISE(ABORT, 'journal en ajout seul : suppression interdite'); END")
+SCHEMA += f"{DECLENCHEUR_MODIFICATION};\n{DECLENCHEUR_SUPPRESSION};\n"
+
 
 # Colonnes ajoutees apres la premiere version : migrees automatiquement.
 # Les noms viennent de cette constante (jamais d'une saisie) : pas d'injection.
@@ -95,8 +110,24 @@ def _migrer(con):
     con.commit()
 
 
-def charger(chemin):
-    """Renvoie un dict {documents, adherents, emprunts, reservations, comptes}."""
+def _etat_journal(con):
+    """(plus petit id, plus grand id) du journal. Il change a chaque ajout ou
+    purge (les modifications sont interdites par les declencheurs) et se lit
+    en O(log n) sur la cle primaire."""
+    return tuple(con.execute("SELECT MIN(id), MAX(id) FROM journal").fetchone())
+
+
+def _lire_journal(con):
+    return [EntreeJournal(datetime.fromisoformat(r["horodatage"]), r["acteur"],
+                          r["action"], r["cible"], r["detail"])
+            for r in con.execute("SELECT horodatage, acteur, action, cible, detail "
+                                 "FROM journal ORDER BY id")]
+
+
+def charger(chemin, journal_connu=None):
+    """Renvoie un dict {documents, adherents, emprunts, reservations, comptes,
+    journal, etat_journal}. Si `journal_connu` (un `etat_journal` lu plus tot)
+    est encore l'etat de la base, le journal n'est pas relu : `journal` vaut None."""
     with closing(connecter(chemin)) as con:
         con.row_factory = sqlite3.Row
         documents = [Document.from_csv_row(dict(r)) for r in
@@ -117,19 +148,27 @@ def charger(chemin):
                           r["role"], r["numero_adherent"])
                    for r in con.execute("SELECT identifiant, hash_mdp, sel, role, "
                                         "numero_adherent FROM comptes")]
-        journal = [EntreeJournal(datetime.fromisoformat(r["horodatage"]), r["acteur"],
-                                 r["action"], r["cible"], r["detail"])
-                   for r in con.execute("SELECT horodatage, acteur, action, cible, detail "
-                                        "FROM journal ORDER BY id")]
+        etat = _etat_journal(con)
+        journal = (None if journal_connu is not None and etat == tuple(journal_connu)
+                   else _lire_journal(con))
     return {"documents": documents, "adherents": adherents, "emprunts": emprunts,
-            "reservations": reservations, "comptes": comptes, "journal": journal}
+            "reservations": reservations, "comptes": comptes, "journal": journal,
+            "etat_journal": etat}
 
 
 def sauvegarder(chemin, documents, adherents, emprunts, reservations=(), comptes=(),
-                journal=()):
+                journal=(), journal_deja_ecrit=None):
+    """Reecrit les donnees et AJOUTE au journal les seules entrees `journal[n:]`,
+    ou n vaut `journal_deja_ecrit` (entrees deja en base) ou, a defaut, le
+    nombre de lignes du journal de la base. Renvoie le nouvel etat du journal."""
+    journal = list(journal)
     with closing(connecter(chemin)) as con:
         with con:  # transaction : commit si tout passe, rollback sinon
-            con.execute("DELETE FROM journal")
+            if journal_deja_ecrit is None:
+                journal_deja_ecrit = con.execute("SELECT COUNT(*) FROM journal").fetchone()[0]
+            if journal_deja_ecrit > len(journal):
+                raise ValueError("le journal de la base contient des entrees absentes de la "
+                                 "memoire : rechargez avant de sauvegarder")
             con.execute("DELETE FROM comptes")
             con.execute("DELETE FROM reservations")
             con.execute("DELETE FROM emprunts")
@@ -162,7 +201,36 @@ def sauvegarder(chemin, documents, adherents, emprunts, reservations=(), comptes
                 "INSERT INTO journal (horodatage, acteur, action, cible, detail) "
                 "VALUES (?, ?, ?, ?, ?)",
                 [(j.horodatage.isoformat(timespec="seconds"), j.acteur, j.action, j.cible,
-                  j.detail) for j in journal])
+                  j.detail) for j in journal[journal_deja_ecrit:]])
+            return _etat_journal(con)
+
+
+def purger_journal(chemin, avant, entree_purge):
+    """Supprime les entrees du journal anterieures a `avant` (duree de
+    conservation) puis ajoute `entree_purge` (qui a purge, combien), dont le
+    detail est forme par `entree_purge(n)`. Le declencheur de suppression est
+    suspendu le temps de LA transaction puis recree : en cas d'erreur, rien
+    n'est supprime et il reste en place. Renvoie le nombre d'entrees supprimees."""
+    limite = avant.isoformat(timespec="seconds")
+    with closing(connecter(chemin)) as con:
+        con.isolation_level = None  # transaction explicite : le DDL en fait partie
+        con.execute("BEGIN IMMEDIATE")
+        try:
+            n = con.execute("SELECT COUNT(*) FROM journal WHERE horodatage < ?",
+                            (limite,)).fetchone()[0]
+            con.execute("DROP TRIGGER journal_sans_suppression")
+            con.execute("DELETE FROM journal WHERE horodatage < ?", (limite,))
+            con.execute(DECLENCHEUR_SUPPRESSION)
+            j = entree_purge(n)
+            con.execute("INSERT INTO journal (horodatage, acteur, action, cible, detail) "
+                        "VALUES (?, ?, ?, ?, ?)",
+                        (j.horodatage.isoformat(timespec="seconds"), j.acteur, j.action,
+                         j.cible, j.detail))
+            con.execute("COMMIT")
+        except BaseException:
+            con.execute("ROLLBACK")
+            raise
+    return n
 
 
 def _iso(d: date | None):

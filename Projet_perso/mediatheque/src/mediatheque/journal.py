@@ -17,7 +17,12 @@ ACTIONS = {
     "reinit_mdp": "Mot de passe réinitialisé",
     "modif_lecteur": "Fiche lecteur modifiée",
     "annul_reservation": "Réservation annulée pour un lecteur",
+    "purge_journal": "Purge du journal (durée de conservation)",
 }
+# Duree de conservation des entrees (RGPD : le journal cite des lecteurs et les
+# titres qu'ils empruntent). La purge n'est JAMAIS automatique : un responsable
+# la lance avec `python -m mediatheque.purge_journal` (Mediatheque.purger_journal).
+CONSERVATION_JOURNAL_JOURS = 365
 _LONGUEURS = {"acteur": 64, "cible": 40, "detail": 300}
 
 
