@@ -162,7 +162,8 @@ class Session:
         """Documents dans la meme veine : liste de (document, statut)."""
         if id_document not in self._m:
             raise DocumentInconnuError(id_document)
-        exclure = {x.id for x, _ in self.fiche(id_document)["meme_createur"]}
+        d = self._m[id_document]
+        exclure = {x.id for x in self._m if d.createur and x.createur == d.createur}
         return [(copy(x), self._statut(x.id))
                 for x in recommandations.similaires(self._m, id_document, n, exclure,
                                                           numero=self.compte.numero_adherent)]

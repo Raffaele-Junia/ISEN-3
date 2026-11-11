@@ -481,8 +481,6 @@ def grosse_base(tmp_path):
     return create_app(tmp_path / "gros.db", secret_key="t", testing=True)
 
 
-@pytest.mark.xfail(strict=True, reason="faille F2 : « Pour vous » recalcule historique x fonds "
-                   "ressemblances (et tous les co-emprunts) a chaque GET /compte, sous le verrou global")
 def test_f2_cout_de_la_page_compte_borne(grosse_base, monkeypatch):
     c = client_connecte(grosse_base, "gros")
     verrou = variable_interne(grosse_base, "verrou")

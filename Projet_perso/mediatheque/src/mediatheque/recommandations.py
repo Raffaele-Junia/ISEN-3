@@ -21,22 +21,97 @@ POIDS_CO_EMPRUNT = 1.2   # par lecteur commun, plafonne
 PLAFOND_CO_EMPRUNT = 3
 SEUIL = 2.5              # en dessous, la ressemblance n'est pas montree
 SEUIL_ANONYMAT = 3       # une paire de co-emprunts ne compte qu'a partir de 3 lecteurs (F1)
+HISTORIQUE_MAX = 10      # lectures recentes prises en compte pour « Pour vous » (F2)
+
+# Cache des co-emprunts (F2) : recalcule seulement quand un pret est ajoute.
+_cache = {"cle": None, "par_lecteur": None, "paires": None}
+
+
+def _etat(m):
+    emprunts = m.emprunts
+    return (id(m), len(emprunts), id(emprunts[-1]) if emprunts else None)
+
+
+def _base(m):
+    cle = _etat(m)
+    if _cache["cle"] != cle:
+        par_lecteur = defaultdict(set)
+        for e in m.emprunts:
+            par_lecteur[e.numero_adherent].add(e.id_document)
+        compteur = Counter()
+        for ids in par_lecteur.values():
+            for a, b in combinations(sorted(ids), 2):
+                compteur[a, b] += 1
+        _cache.update(cle=cle, par_lecteur=par_lecteur,
+                      paires={k: v for k, v in compteur.items() if v >= SEUIL_ANONYMAT})
+    return _cache["par_lecteur"], _cache["paires"]
+
+
+class CoEmprunts:
+    """Vue en lecture des co-emprunts pour un demandeur : ses propres emprunts ne
+    comptent pas, et une paire n'existe qu'avec SEUIL_ANONYMAT AUTRES lecteurs (F1)."""
+
+    def __init__(self, paires, retires=frozenset()):
+        self._paires, self._retires = paires, retires
+
+    def get(self, cle, defaut=0):
+        v = self._paires.get(cle, 0) - (1 if cle in self._retires else 0)
+        return v if v >= SEUIL_ANONYMAT else defaut
+
+    def partenaires(self, id_document):
+        return {b if a == id_document else a for a, b in self._paires
+                if id_document in (a, b) and self.get((a, b))}
+
+    def __bool__(self):
+        return bool(self._paires)
 
 
 def co_emprunts(m, exclure=None):
-    """Compteur {(id_a, id_b): nb de lecteurs ayant emprunte les deux}, a < b.
+    """Co-emprunts anonymises vus par le lecteur `exclure` (voir CoEmprunts)."""
+    par_lecteur, paires = _base(m)
+    retires = frozenset()
+    if exclure is not None and exclure in par_lecteur:
+        siens = sorted(par_lecteur[exclure])
+        retires = frozenset(p for p in combinations(siens, 2) if p in paires)
+    return CoEmprunts(paires, retires)
 
-    Anonymat (F1) : le lecteur `exclure` (celui qui demande) n'est pas compte, et
-    une paire n'est gardee que si au moins SEUIL_ANONYMAT AUTRES lecteurs l'ont."""
-    par_lecteur = defaultdict(set)
-    for e in m.emprunts:
-        if e.numero_adherent != exclure:
-            par_lecteur[e.numero_adherent].add(e.id_document)
-    compteur = Counter()
-    for ids in par_lecteur.values():
-        for a, b in combinations(sorted(ids), 2):
-            compteur[a, b] += 1
-    return Counter({k: v for k, v in compteur.items() if v >= SEUIL_ANONYMAT})
+
+def _candidats(m, doc, co):
+    """Documents partageant au moins un critere de contenu avec `doc` (index F2)."""
+    index = _index(m)
+    cles = [("g", doc.genre)] if doc.genre else []
+    cles += [("t", t) for t in doc.themes]
+    if doc.createur:
+        cles.append(("c", doc.createur))
+    if doc.CLE == "revue":
+        cles.append(("r", doc.titre))
+    ids = set()
+    for cle in cles:
+        ids |= index.get(cle, set())
+    if co:
+        ids |= co.partenaires(doc.id)
+    ids.discard(doc.id)
+    return ids
+
+
+_cache_index = {"cle": None, "index": None}
+
+
+def _index(m):
+    cle = (id(m), len(m), tuple(sorted((d.id, d.genre, d.themes, d.createur) for d in m)).__hash__())
+    if _cache_index["cle"] != cle:
+        index = defaultdict(set)
+        for d in m:
+            if d.genre:
+                index["g", d.genre].add(d.id)
+            for t in d.themes:
+                index["t", t].add(d.id)
+            if d.createur:
+                index["c", d.createur].add(d.id)
+            if d.CLE == "revue":
+                index["r", d.titre].add(d.id)
+        _cache_index.update(cle=cle, index=index)
+    return _cache_index["index"]
 
 
 def ressemblance(a, b, co=None):
@@ -64,7 +139,8 @@ def similaires(m, id_document, n=6, exclure=(), co=None, numero=None):
     reference = m[id_document]
     co = co_emprunts(m, exclure=numero) if co is None else co
     exclure = set(exclure) | {id_document}
-    notes = [(ressemblance(reference, d, co), d) for d in m if d.id not in exclure]
+    notes = [(ressemblance(reference, m[i], co), m[i])
+             for i in _candidats(m, reference, co) if i not in exclure]
     notes = [(s, d) for s, d in notes if s >= SEUIL]
     # a score egal : le document en rayon d'abord, puis l'ordre alphabetique
     notes.sort(key=lambda sd: (-sd[0], not m.disponible(sd[1].id), sd[1].titre))
@@ -86,14 +162,15 @@ def pour_adherent(m, numero, n=8, aujourdhui=None):
     Les emprunts recents pesent plus que les anciens.
     """
     aujourdhui = aujourdhui or date.today()
-    historique = {}  # id -> poids (recence)
-    for e in m.emprunts:
-        if e.numero_adherent == numero:
-            age = max(0, (aujourdhui - e.date_emprunt).days)
-            poids = 1.0 if age < 60 else 0.6 if age < 180 else 0.35
-            historique[e.id_document] = max(historique.get(e.id_document, 0), poids)
-    deja_vus = set(historique) | {r.id_document for r in m.reservations
-                                  if r.numero_adherent == numero}
+    historique, deja_vus = {}, set()  # id -> poids (recence)
+    for e in sorted((e for e in m.emprunts if e.numero_adherent == numero),
+                    key=lambda e: e.date_emprunt, reverse=True):
+        deja_vus.add(e.id_document)
+        if e.id_document in historique or len(historique) >= HISTORIQUE_MAX:
+            continue
+        age = max(0, (aujourdhui - e.date_emprunt).days)
+        historique[e.id_document] = 1.0 if age < 60 else 0.6 if age < 180 else 0.35
+    deja_vus |= {r.id_document for r in m.reservations if r.numero_adherent == numero}
 
     def repli():
         return [(d, "Très demandé en ce moment")
@@ -106,7 +183,8 @@ def pour_adherent(m, numero, n=8, aujourdhui=None):
     scores, raisons = defaultdict(float), {}
     for id_vu, poids in historique.items():
         vu = m[id_vu]
-        for candidat in m:
+        for id_candidat in _candidats(m, vu, co):
+            candidat = m[id_candidat]
             if candidat.id in deja_vus:
                 continue
             s = ressemblance(vu, candidat, co) * poids
@@ -120,8 +198,14 @@ def pour_adherent(m, numero, n=8, aujourdhui=None):
     retenus.sort(key=lambda i: (-scores[i], not m.disponible(i, numero), m[i].titre))
     resultat = []
     for i in retenus[:n]:
-        vu = raisons[i][1]
+        vu, candidat = raisons[i][1], m[i]
         verbe = "vu" if vu.CLE == "dvd" else "lu"
-        resultat.append((m[i], f"Parce que vous avez {verbe} « {vu.titre} »"))
+        if vu.CLE == candidat.CLE == "revue" and vu.titre == candidat.titre:
+            raison = f"Un autre numéro de « {vu.titre} »"
+        elif ressemblance(vu, candidat) < SEUIL:  # le lien vient des usages, pas du contenu
+            raison = f"Les lecteurs de « {vu.titre} » l'ont aussi emprunté"
+        else:
+            raison = f"Parce que vous avez {verbe} « {vu.titre} »"
+        resultat.append((candidat, raison))
     # fonds sans fiches (genres, themes) : rien de ressemblant, on propose les plus demandes
     return resultat or repli()
