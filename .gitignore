@@ -1,0 +1,36 @@
+# --- Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.egg-info/
+build/
+dist/
+
+# --- Secrets et configuration locale (garder seulement les modèles *.exemple)
+.env
+.env.*
+!.env.exemple
+!.env.example
+
+# --- Bases locales et fichiers générés
+*.db
+*.sqlite3
+
+# --- Modèles téléchargés au premier lancement
+Projet_perso/Pierre_Papier/hand_landmarker.task
+
+# --- Outils locaux (configuration propre à une machine)
+.claude/launch.json
+.claude/settings.local.json
+
+# --- Éditeurs et systèmes
+.vscode/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db
+desktop.ini
