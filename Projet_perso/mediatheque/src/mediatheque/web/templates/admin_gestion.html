@@ -35,13 +35,15 @@
             <td>{% if statut != 'disponible' %}<span class="tampon {{ statut }}">{{ {'emprunte': 'Sorti', 'reserve': 'Réservé'}[statut] }}</span>{% else %}<span class="muted small">en rayon</span>{% endif %}</td>
             <td class="actions">
               <details class="confirmer">
-                <summary class="btn second petit" aria-label="Retirer {{ d.titre }} du fonds">Retirer</summary>
+                <summary class="btn second petit" aria-label="Retirer {{ d.titre }} du fonds"><span class="si-ferme">Retirer</span><span class="si-ouvert">Non, garder</span></summary>
                 <form method="post" action="{{ url_for('admin_supprimer_document', id_document=d.id) }}">{{ jeton() }}
                   <button class="btn petit danger" type="submit">Oui, retirer « {{ d.titre }} »</button>
                 </form>
               </details>
             </td>
           </tr>
+        {% else %}
+          <tr><td colspan="5" class="vide">Aucun document pour « {{ q }} ». <a href="{{ url_for('gestion') }}">Tout afficher</a></td></tr>
         {% endfor %}
         </tbody>
       </table>
@@ -87,6 +89,8 @@
                 {% if c.reservations %}<span class="tampon reserve">{{ c.reservations|length }} réservation{{ 's' if c.reservations|length > 1 }}</span>{% endif %}
                 {% if not retards and not c.reservations %}<span class="muted small">rien à signaler</span>{% endif %}</td>
           </tr>
+        {% else %}
+          <tr><td colspan="4" class="vide">Aucun lecteur inscrit pour le moment.</td></tr>
         {% endfor %}
         </tbody>
       </table>

@@ -160,3 +160,11 @@ def test_mis_de_cote_pour(mr):
     admin = ouvrir_session(mr, "admin", MDP)
     assert admin.mis_de_cote_pour("D001").numero == "A001"
     assert admin.mis_de_cote_pour("D003") is None
+
+
+def test_synonymes_de_recherche(mr):
+    lea = ouvrir_session(mr, "lea", MDP)
+    assert {d.id for d, _ in lea.catalogue("sf")} == {"D001", "D003", "D004", "D006"}
+    assert {d.id for d, _ in lea.catalogue("film")} == {"D004", "D005"}
+    # un mot de deux lettres sans synonyme n'est cherche qu'en mot entier
+    assert lea.catalogue("ar") == []

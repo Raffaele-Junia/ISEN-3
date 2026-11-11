@@ -284,3 +284,10 @@ def test_compteur_annonce_les_filtres_et_propose_tout_le_fonds(lea):
     page = lea.get("/catalogue?q=zzzz&type=dvd").get_data(as_text=True)
     assert "films" in page and "retirer les filtres" in page
     assert "dans tout le fonds" in page
+
+
+def test_gestion_recherche_vide_et_confirmation_refermable(admin):
+    page = admin.get("/admin/gestion?q=zzzz").get_data(as_text=True)
+    assert "Aucun document pour « zzzz »" in page
+    page = admin.get("/admin/gestion").get_data(as_text=True)
+    assert "Non, garder" in page

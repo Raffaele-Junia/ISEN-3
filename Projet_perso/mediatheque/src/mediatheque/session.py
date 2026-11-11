@@ -28,6 +28,45 @@ _FORMAT_ID_DOCUMENT = re.compile(r"D\d+")
 def _sans_accents(texte):
     """« Émile Zola » -> « emile zola » (recherche tolerante)."""
     return unicodedata.normalize("NFKD", texte).encode("ascii", "ignore").decode().lower()
+
+
+# Mots courants des lecteurs -> termes du catalogue (sans accents). Un mot de la
+# recherche correspond si l'UNE de ses variantes apparait (N10).
+SYNONYMES = {
+    "sf": ("science-fiction",),
+    "scifi": ("science-fiction",),
+    "bd": ("bande dessinee",),
+    "comics": ("bande dessinee",),
+    "manga": ("bande dessinee", "manga"),
+    "anime": ("animation",),
+    "animes": ("animation",),
+    "dessin": ("dessin", "animation"),
+    "polar": ("policier", "polar", "thriller"),
+    "policier": ("policier", "thriller"),
+    "film": ("film", "dvd"),
+    "films": ("film", "dvd"),
+    "magazine": ("presse", "magazine", "revue"),
+    "journal": ("presse", "journal"),
+    "enfant": ("jeunesse", "enfant"),
+    "enfants": ("jeunesse", "enfant"),
+    "jeunesse": ("jeunesse",),
+    "ado": ("ado",),
+    "ados": ("ado",),
+    "python": ("python",),
+}
+
+
+def _ponctuation(texte):
+    """Tirets, apostrophes, ponctuation -> espaces (« science-fiction » = « science fiction »)."""
+    return " ".join(re.sub(r"[^a-z0-9]+", " ", texte).split())
+
+
+def _variantes(mot):
+    """Les variantes d'un mot ; un mot de 1-2 lettres sans synonyme n'est cherche
+    qu'en mot entier (evite « sf » trouve au milieu de « transformer »)."""
+    if mot in SYNONYMES:
+        return SYNONYMES[mot]
+    return (f" {mot} ",) if len(mot) <= 2 else (mot,)
 _JETON = object()  # seul ouvrir_session peut construire une Session (S4)
 
 
@@ -117,7 +156,8 @@ class Session:
         La recherche ignore accents et majuscules (« emile zola », « miserables »),
         et chaque mot doit apparaitre dans l'identifiant, le titre, l'auteur ou le
         detail, le genre, les themes, le resume, l'editeur ou le public."""
-        mots = _sans_accents(texte).split()
+        mots = [tuple(_ponctuation(v) if v.strip() == v else v for v in _variantes(m))
+                for m in _ponctuation(_sans_accents(texte)).split()]
         resultat = []
         for d in sorted(self._m):
             if type_doc and d.CLE != type_doc:
@@ -127,9 +167,10 @@ class Session:
             if public and d.public != public:
                 continue
             if mots:
-                botte = _sans_accents(" ".join((d.id, d.titre, str(d.detail), d.genre,
-                                                *d.themes, d.resume, d.editeur, d.public)))
-                if not all(m in botte for m in mots):
+                botte = " " + _ponctuation(_sans_accents(" ".join((
+                    d.id, d.titre, str(d.detail), d.genre, d.TYPE, *d.themes, d.resume,
+                    d.editeur, d.public)))) + " "
+                if not all(any(v in botte for v in variantes) for variantes in mots):
                     continue
             resultat.append((copy(d), self._statut(d.id)))
         return resultat

@@ -353,10 +353,13 @@ input:focus-visible, select:focus-visible, textarea:focus-visible { outline: 3px
 .pour-qui a { display: inline-flex; align-items: center; min-height: 44px; padding: 0 14px; border-radius: 999px; color: var(--encre-2); text-decoration: none; font-size: 15px; }
 .pour-qui a:hover { background: var(--papier-2); color: var(--encre); }
 .pour-qui a[aria-current="true"] { background: var(--accent); color: #FFF; }
-.info-pleine { font-size: 13px; line-height: 1.3; }
+.info-pleine { display: inline-flex; align-items: center; min-height: 44px; font-size: 14px; line-height: 1.3; }
 .confirmer > summary { list-style: none; }
 .confirmer > summary::-webkit-details-marker { display: none; }
-.confirmer[open] > summary { display: none; }
+.confirmer { display: inline-flex; flex-direction: column; align-items: flex-end; gap: 6px; }
+.confirmer .si-ouvert { display: none; }
+.confirmer[open] .si-ouvert { display: inline; }
+.confirmer[open] .si-ferme { display: none; }
 .btn.danger { background: var(--tampon-rouge); box-shadow: 0 2px 0 #6E2412; }
 .btn.danger:hover { background: #8F2E17; }
 .recherche-gestion { padding: 14px 24px; border-bottom: 1px dashed var(--filet); flex-wrap: wrap; }
