@@ -19,20 +19,21 @@
     <div class="fiche">
       <div class="fiche-entete">
         <h2>Ma carte</h2>
-        <span class="surtitre">N° lecteur</span>
       </div>
       <form method="post" action="{{ url_for('connexion') }}">
         {{ jeton() }}
-        {% if erreur %}<div class="message erreur" role="alert">{{ erreur|capitalize }}.</div>{% endif %}
+        {% if erreur %}<div class="message erreur" role="alert">{{ erreur }}{% if not erreur.endswith('.') %}.{% endif %}</div>{% endif %}
         <div class="champ">
           <label for="identifiant">Identifiant</label>
-          <input id="identifiant" name="identifiant" autocomplete="username" required maxlength="64" value="{{ identifiant }}" placeholder="prenom.nom" autofocus>
+          <input id="identifiant" name="identifiant" autocomplete="username" required maxlength="64" value="{{ identifiant }}" placeholder="marie.dupont" autofocus aria-describedby="aide-identifiant">
+          <span class="aide" id="aide-identifiant">Votre prénom et votre nom, sans accent, séparés par un point.</span>
         </div>
         <div class="champ">
           <label for="mot_de_passe">Mot de passe</label>
           <input id="mot_de_passe" name="mot_de_passe" type="password" autocomplete="current-password" required maxlength="256">
         </div>
         <button class="btn plein" type="submit">Entrer</button>
+        <p class="note">Mot de passe oublié&nbsp;? Demandez à l'accueil, on vous en donne un nouveau tout de suite.</p>
         <p class="note">Pas encore de carte&nbsp;? Passez nous voir à l'accueil, on vous l'imprime en deux minutes.</p>
       </form>
     </div>

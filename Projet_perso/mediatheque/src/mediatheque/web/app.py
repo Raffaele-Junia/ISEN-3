@@ -31,9 +31,11 @@ from markupsafe import Markup
 
 from ..exceptions import AuthentificationError, MediathequeError
 from ..mediatheque import Mediatheque
+from ..reservation import MAX_RESERVATIONS
 from ..session import ouvrir_session
 
-TYPES = [("livre", "Livre"), ("dvd", "DVD"), ("revue", "Revue")]
+TYPES = [("livre", "Livre"), ("dvd", "Film (DVD)"), ("revue", "Presse")]
+PUBLICS = {"jeunesse": "Enfants", "ado": "Ados", "tout public": "Tout public", "adulte": "Adultes"}
 LIBELLE_EXTRA = {"livre": "Auteur", "dvd": "Durée (min)", "revue": "Numéro"}
 
 NOM_MEDIATHEQUE = os.environ.get("MEDIATHEQUE_NOM", "Médiathèque des Tilleuls")
@@ -101,7 +103,7 @@ FENETRE_IP_S = 60            # ...sur une fenetre glissante d'une minute
 INACTIVITE_S = 30 * 60       # session fermee apres 30 min sans requete
 DUREE_MAX_S = 12 * 3600      # et dans tous les cas 12 h apres la connexion
 SESSIONS_PAR_COMPTE = 5     # au-dela, la plus ancienne session du compte est fermee
-MESSAGE_EXPIRATION ="session expirée, reconnectez-vous"
+MESSAGE_EXPIRATION = "Session expirée, reconnectez-vous"
 
 
 class LimiteParIP:
@@ -393,26 +395,32 @@ def create_app(db, secret_key=None, testing=False, *,
         genre = request.args.get("genre") or None
         if genre not in {nom for nom, _ in genres}:
             genre = None
+        publics = [(cle, PUBLICS[cle], nb) for cle, nb in g.s.publics() if cle in PUBLICS]
+        public = request.args.get("public") or None
+        if public not in PUBLICS:
+            public = None
         tous = g.s.catalogue()
-        resultats = g.s.catalogue(texte, type_doc, genre)
+        resultats = g.s.catalogue(texte, type_doc, genre, public)
         return render_template(
             "catalogue.html", lignes=lignes_etagere(resultats), texte=texte, type_doc=type_doc,
-            genre=genre, genres=genres,
+            genre=genre, genres=genres, public=public, publics=publics,
             total=len(tous), dispo=sum(1 for _, st in tous if st == "disponible"))
 
     def mes_documents():
-        """{id: libelle} des documents que le lecteur a chez lui ou a reserves."""
+        """{id: libelle} des documents que le lecteur a chez lui ou a reserves,
+        et si sa limite de reservations est atteinte (G3)."""
         if g.s.est_responsable:
-            return {}
+            return {}, False
         compte = g.s.mon_compte()
         a_moi = {r["document"].id: "Réservé ✓" for r in compte["reservations"]}
         a_moi |= {e["document"].id: "Chez vous" for e in compte["emprunts"]}
-        return a_moi
+        return a_moi, len(compte["reservations"]) >= MAX_RESERVATIONS
 
     def lignes_etagere(documents_statuts, raisons=None):
-        a_moi = mes_documents()
+        a_moi, pleines = mes_documents()
         return [{"doc": d, "statut": st, "attente": g.s.file_attente(d.id),
-                 "a_moi": a_moi.get(d.id), "raison": (raisons or {}).get(d.id)}
+                 "a_moi": a_moi.get(d.id), "raison": (raisons or {}).get(d.id),
+                 "resa_pleines": pleines}
                 for d, st in documents_statuts]
 
     @app.get("/document/<id_document>")
@@ -424,8 +432,10 @@ def create_app(db, secret_key=None, testing=False, *,
             f = g.s.fiche(id_document)
         except MediathequeError:
             abort(404)
+        a_moi, pleines = mes_documents()
         return render_template(
-            "document.html", f=f, d=f["document"], a_moi=mes_documents().get(id_document),
+            "document.html", f=f, d=f["document"], a_moi=a_moi.get(id_document),
+            resa_pleines=pleines, PUBLICS=PUBLICS,
             meme_createur=lignes_etagere(f["meme_createur"]),
             similaires=lignes_etagere(g.s.similaires(id_document)))
 
@@ -463,12 +473,12 @@ def create_app(db, secret_key=None, testing=False, *,
         nouveau = request.form.get("nouveau", "")
         try:
             if nouveau != request.form.get("confirmation", ""):
-                raise MediathequeError("les deux mots de passe ne correspondent pas")
+                raise MediathequeError("Les deux nouveaux mots de passe ne sont pas identiques.")
             with emplacement_hachage():
                 try:
                     g.s.changer_mot_de_passe(request.form.get("ancien", ""), nouveau)
                 except AuthentificationError:
-                    raise MediathequeError("mot de passe actuel incorrect") from None
+                    raise MediathequeError("Le mot de passe actuel est incorrect.") from None
         except MediathequeError as e:
             flash(str(e), "erreur")
             return redirect(url_for("compte"))
@@ -506,24 +516,34 @@ def create_app(db, secret_key=None, testing=False, *,
             "admin_tableau.html", stats=stats, retards=retards, top=top,
             top_max=max((nb for _, nb in top), default=1),
             documents=[d for d, _ in catalogue_complet], adherents=adherents,
+            sortis=[d for d, st in catalogue_complet if st == "emprunte"],
             onglet=request.args.get("onglet", "emprunt"))
 
     @app.post("/admin/emprunt")
     @responsable_requis
     @action
     def admin_emprunt():
-        e = g.s.enregistrer_emprunt(request.form["id_document"], request.form["numero"])
-        flash(f"Emprunt de {e.id_document} par {e.numero_adherent} enregistré.", "ok")
+        e = g.s.enregistrer_emprunt(_code(request.form["id_document"]),
+                                    _code(request.form["numero"]))
+        d = g.s.fiche(e.id_document)["document"]
+        lecteur = next(a for a in g.s.adherents() if a.numero == e.numero_adherent)
+        flash(f"Prêt enregistré : « {d.titre} » pour {lecteur.nom_complet} ({lecteur.numero}), "
+              f"à rendre le {date_courte(e.date_limite(d.duree_pret_jour))}.", "ok")
         return redirect(url_for("tableau_de_bord"))
 
     @app.post("/admin/retour")
     @responsable_requis
     @action
     def admin_retour():
-        e = g.s.enregistrer_retour(request.form["id_document"])
-        message = f"Retour de {e.id_document} enregistré."
-        if g.s.file_attente(e.id_document):
-            message += " Le document est mis de côté pour le premier de la file."
+        e = g.s.enregistrer_retour(_code(request.form["id_document"]))
+        d = g.s.fiche(e.id_document)["document"]
+        message = f"Retour de « {d.titre} » enregistré."
+        pour = g.s.mis_de_cote_pour(e.id_document)
+        if pour is not None:
+            message += (f" Réservé : mettez-le de côté pour {pour.nom_complet} ({pour.numero}),"
+                        f" sur l'étagère des réservés.")
+        else:
+            message += f" Il retourne en rayon sous la cote {cote(d)}."
         flash(message, "ok")
         return redirect(url_for("tableau_de_bord", onglet="retour"))
 
@@ -543,11 +563,12 @@ def create_app(db, secret_key=None, testing=False, *,
     @responsable_requis
     def gestion():
         onglet = "adherents" if request.args.get("onglet") == "adherents" else "documents"
-        catalogue_complet = g.s.catalogue()
+        q = request.args.get("q", "")[:100]
+        catalogue_complet = g.s.catalogue(q)
         adherents = [(a, g.s.mon_compte(a.numero)) for a in g.s.adherents()]
-        ids = [d.id for d, _ in catalogue_complet]
+        ids = [d.id for d, _ in g.s.catalogue()]
         return render_template(
-            "admin_gestion.html", onglet=onglet, documents=catalogue_complet,
+            "admin_gestion.html", onglet=onglet, documents=catalogue_complet, q=q,
             adherents=adherents, genres=g.s.genres(),
             prochain_doc=_prochain("D", ids),
             prochain_adh=_prochain("A", [a.numero for a, _ in adherents]))
@@ -632,6 +653,11 @@ def _cellule(valeur):
     """Neutralise les formules a l'ouverture dans Excel (injection CSV)."""
     texte = str(valeur)
     return "'" + texte if texte[:1] in ("=", "+", "-", "@", "\t", "\r") else texte
+
+
+def _code(saisie):
+    """« D005 — Design Patterns » ou « d005 » -> « D005 » (saisie du guichet)."""
+    return (saisie.strip().split() or [""])[0].upper()[:10]
 
 
 def _prochain(prefixe, existants):

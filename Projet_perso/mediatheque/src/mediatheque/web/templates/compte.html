@@ -8,7 +8,7 @@
 {% set a_retirer = c.reservations|selectattr('statut', 'equalto', 'disponible')|list %}
 <div class="titre-page">
   <div>
-    <span class="surtitre">Carte n° {{ a.numero }} · formule {{ a.type }}</span>
+    <span class="surtitre">Carte n° {{ a.numero }} · carte {{ a.type }} : {{ a.quota }} documents à la fois</span>
     <h1>Bonjour {{ a.prenom }}.</h1>
     <p class="chapo">
       {% if a_retirer %}Bonne nouvelle&nbsp;: <strong>{{ a_retirer[0].document.titre }}</strong> vous attend à l'accueil jusqu'au {{ a_retirer[0].date_limite_retrait|court }}.
@@ -20,7 +20,7 @@
   <a href="#mot-de-passe" class="small">Changer mon mot de passe</a>
 </div>
 
-<div class="resume">
+<div class="synthese">
   <div class="carte chiffre">
     <span class="label">Chez vous</span>
     <span class="valeur">{{ nb_emp }} <small>sur {{ a.quota }}</small></span>
@@ -54,7 +54,7 @@
           <td class="date">{{ e.date_emprunt|court }}</td>
           <td class="date">{{ e.date_limite|court }}</td>
           <td>
-            {% if e.jours_retard %}<span class="tampon retard">{{ e.jours_retard }} j de retard</span>
+            {% if e.jours_retard %}<span class="tampon retard">{{ e.jours_retard }} jour{{ 's' if e.jours_retard > 1 }} de retard</span>
             {% elif e.date_limite == aujourdhui %}<span class="tampon attention">Aujourd'hui</span>
             {% endif %}
           </td>
@@ -74,10 +74,10 @@
       {% if r.statut == 'disponible' %}
         <span class="tampon ok">À retirer avant le {{ r.date_limite_retrait|court }}</span>
       {% else %}
-        <span class="tampon en_attente">{{ r.rang }}{{ 'er' if r.rang == 1 else 'e' }} dans la file</span>
+        <span class="tampon en_attente">{% if r.rang == 1 %}Vous êtes le 1er à l'attendre{% else %}{{ r.rang }}e à l'attendre{% endif %}</span>
       {% endif %}
       <form method="post" action="{{ url_for('annuler', id_document=r.document.id) }}">{{ jeton() }}
-        <button class="btn second petit" type="submit" aria-label="Annuler la réservation de {{ r.document.titre }}">Je n'en veux plus</button>
+        <button class="btn second petit" type="submit" aria-label="Annuler la réservation de {{ r.document.titre }}">Annuler la réservation</button>
       </form>
     </div>
   {% else %}

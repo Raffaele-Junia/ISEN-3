@@ -3,7 +3,7 @@
 {% set img = couverture(d) %}
 <div class="couverture {{ d.CLE }} t{{ teinte(d) }}{{ ' photo' if img }}{{ ' grande' if grande }}">
   {% if img %}
-    <img src="{{ url_for('static', filename=img) }}" alt="Couverture de {{ d.titre }}" loading="lazy" width="300" height="420">
+    <img src="{{ url_for('static', filename=img) }}" alt="{{ ('Couverture de ' ~ d.titre) if grande else '' }}" loading="lazy" width="300" height="420">
   {% elif d.CLE == 'revue' %}
     <span class="c-type">Presse · {{ d.annee }}</span>
     <span class="c-titre">{{ d.titre }}</span>
@@ -40,6 +40,8 @@
     {% if not s.est_responsable and l.statut != 'disponible' %}
       {% if l.a_moi %}
         <span class="btn petit fait">{{ l.a_moi }}</span>
+      {% elif l.resa_pleines %}
+        <a class="info-pleine" href="{{ url_for('compte') }}#h-res">3 réservations en cours : en annuler une</a>
       {% else %}
         <form method="post" action="{{ url_for('reserver', id_document=d.id) }}">{{ jeton() }}
           <button class="btn second petit" type="submit" aria-label="Réserver {{ d.titre }}">Réserver</button>

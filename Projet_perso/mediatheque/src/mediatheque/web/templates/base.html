@@ -9,6 +9,7 @@
 <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
+<a class="evitement" href="#contenu">Aller au contenu</a>
 {% if s %}
 {% if s.est_responsable %}<div class="bandeau-admin">Espace du personnel — banque de prêt</div>{% endif %}
 <header class="entete">
@@ -33,7 +34,7 @@
 </header>
 {% endif %}
 {% block corps %}
-<main class="page">
+<main class="page" id="contenu">
   {% with messages = get_flashed_messages(with_categories=true) %}
     {% for categorie, texte in messages %}
       <div class="message {{ categorie }}" role="{{ 'alert' if categorie == 'erreur' else 'status' }}">{{ texte }}</div>

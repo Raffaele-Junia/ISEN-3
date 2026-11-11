@@ -27,23 +27,26 @@
       <form method="post" action="{{ url_for('admin_retour') }}" class="pile">
         {{ jeton() }}
         <div class="champ"><label for="doc-r">Document rapporté</label>
-          <select id="doc-r" name="id_document" required>
-            {% for d in documents %}<option value="{{ d.id }}">{{ cote(d) }} — {{ d.titre }}</option>{% endfor %}
-          </select></div>
+          <input id="doc-r" name="id_document" list="liste-sortis" required autocomplete="off" autofocus
+                 placeholder="N° d'inventaire ou titre" aria-describedby="aide-r">
+          <datalist id="liste-sortis">{% for d in sortis %}<option value="{{ d.id }}">{{ d.titre }} · {{ cote(d) }}</option>{% endfor %}</datalist>
+          <span class="aide" id="aide-r">{{ sortis|length }} documents sont sortis. Tapez le n° (D012) ou le début du titre.</span></div>
         <button class="btn plein" type="submit">Enregistrer le retour</button>
-        <p class="muted small">S'il est réservé, il part directement sur l'étagère des réservés.</p>
+        <p class="muted small">S'il est réservé, on vous dit pour qui le mettre de côté.</p>
       </form>
     {% else %}
       <form method="post" action="{{ url_for('admin_emprunt') }}" class="pile">
         {{ jeton() }}
         <div class="champ"><label for="adh-e">Lecteur</label>
-          <select id="adh-e" name="numero" required>
-            {% for a in adherents %}<option value="{{ a.numero }}">{{ a.nom|upper }} {{ a.prenom }} · {{ a.numero }}</option>{% endfor %}
-          </select></div>
+          <input id="adh-e" name="numero" list="liste-lecteurs" required autocomplete="off" autofocus
+                 placeholder="N° de carte ou nom" aria-describedby="aide-adh">
+          <datalist id="liste-lecteurs">{% for a in adherents %}<option value="{{ a.numero }}">{{ a.nom|upper }} {{ a.prenom }}</option>{% endfor %}</datalist>
+          <span class="aide" id="aide-adh">Tapez le n° de carte (A012) ou le début du nom.</span></div>
         <div class="champ"><label for="doc-e">Document</label>
-          <select id="doc-e" name="id_document" required>
-            {% for d in documents %}<option value="{{ d.id }}">{{ cote(d) }} — {{ d.titre }}</option>{% endfor %}
-          </select></div>
+          <input id="doc-e" name="id_document" list="liste-documents" required autocomplete="off"
+                 placeholder="N° d'inventaire ou titre" aria-describedby="aide-doc">
+          <datalist id="liste-documents">{% for d in documents %}<option value="{{ d.id }}">{{ d.titre }} · {{ cote(d) }}</option>{% endfor %}</datalist>
+          <span class="aide" id="aide-doc">Le n° est imprimé sous le code-barres (D012).</span></div>
         <button class="btn plein" type="submit">Enregistrer le prêt</button>
       </form>
     {% endif %}

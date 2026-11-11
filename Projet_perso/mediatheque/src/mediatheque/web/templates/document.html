@@ -30,17 +30,21 @@
 
     <div class="dispo dispo-{{ f.statut }}">
       {% if f.statut == 'disponible' %}
-        <p><strong>En rayon.</strong> Vous le trouverez sous la cote <span class="mono">{{ cote(d) }}</span>.</p>
+        <p><strong>En rayon&nbsp;!</strong> Pas besoin de le réserver : passez le prendre, il est rangé sous l'étiquette <span class="mono">{{ cote(d) }}</span> (collée sur le dos{{ ' du boîtier' if d.CLE == 'dvd' else '' }}).</p>
       {% elif a_moi %}
-        <p><strong>{{ 'Il est chez vous.' if a_moi == 'Chez vous' else 'Vous êtes dans la file.' }}</strong>
+        <p><strong>{{ 'Il est chez vous.' if a_moi == 'Chez vous' else 'Vous êtes dans la file d\'attente.' }}</strong>
           <a href="{{ url_for('compte') }}">Voir ma carte</a></p>
       {% else %}
-        <p><strong>{{ 'Sorti' if f.statut == 'emprunte' else 'Mis de côté pour un autre lecteur' }}</strong>{% if f.retour_prevu %}, retour prévu le {{ f.retour_prevu|court }}{% endif %}.
-          {% if f.attente %}{{ f.attente }} personne{{ 's' if f.attente > 1 }} dans la file.{% else %}Personne ne l'attend encore.{% endif %}</p>
+        <p><strong>{{ 'Sorti' if f.statut == 'emprunte' else 'Mis de côté pour un autre lecteur' }}</strong>{% if f.retour_prevu %}{% if f.retour_prevu < aujourdhui %}, en retard (attendu le {{ f.retour_prevu|court }}){% else %}, retour prévu le {{ f.retour_prevu|court }}{% endif %}{% endif %}.
+          {% if f.attente %}{{ f.attente }} personne{{ 's' if f.attente > 1 }} {{ 'l\'attendent' if f.attente > 1 else 'l\'attend' }} déjà.{% else %}Personne ne l'attend encore : vous seriez le premier.{% endif %}</p>
         {% if not s.est_responsable %}
-          <form method="post" action="{{ url_for('reserver', id_document=d.id) }}">{{ jeton() }}
-            <button class="btn" type="submit" aria-label="Réserver {{ d.titre }}">Le réserver</button>
-          </form>
+          {% if resa_pleines %}
+            <a class="btn second" href="{{ url_for('compte') }}#h-res">3 réservations en cours : en annuler une</a>
+          {% else %}
+            <form method="post" action="{{ url_for('reserver', id_document=d.id) }}">{{ jeton() }}
+              <button class="btn" type="submit" aria-label="Réserver {{ d.titre }}">Le réserver</button>
+            </form>
+          {% endif %}
         {% endif %}
       {% endif %}
     </div>
@@ -49,7 +53,7 @@
       {% if d.genre %}<dt>Genre</dt><dd><a href="{{ url_for('catalogue', genre=d.genre) }}">{{ d.genre }}</a></dd>{% endif %}
       {% if d.editeur %}<dt>{{ 'Studio' if d.CLE == 'dvd' else 'Éditeur' }}</dt><dd>{{ d.editeur }}</dd>{% endif %}
       {% if d.pages %}<dt>Pages</dt><dd>env. {{ d.pages }}</dd>{% endif %}
-      {% if d.public %}<dt>Public</dt><dd>{{ d.public }}</dd>{% endif %}
+      {% if d.public %}<dt>Pour qui</dt><dd>{{ {'jeunesse': 'enfants', 'ado': 'adolescents', 'adulte': 'adultes', 'tout public': 'tout public'}.get(d.public, d.public) }}</dd>{% endif %}
       {% if d.isbn %}<dt>ISBN</dt><dd class="mono">{{ d.isbn }}</dd>{% endif %}
       <dt>Prêts</dt><dd>{{ f.nb_prets }} fois depuis son arrivée</dd>
       <dt>Durée de prêt</dt><dd>{{ d.duree_pret_jour }} jours</dd>

@@ -101,7 +101,7 @@ def test_f1_similaires_ne_depend_pas_d_un_seul_autre_lecteur():
 def test_fiche_d_un_lecteur_ne_contient_ni_nom_ni_numero(web_app, web_ines):
     """D001 est chez lea (A001) : ines voit « Sorti, retour prevu », jamais qui."""
     page = web_ines.get("/document/D001").get_data(as_text=True)
-    assert "Sorti" in page and "retour prévu" in page
+    assert "Sorti" in page and ("retour prévu" in page or "en retard (attendu le" in page)
     for indice in ("A001", "Martin", "Historique des prêts"):
         assert indice not in page
     m = web_app.extensions["mediatheque"]

@@ -111,7 +111,7 @@ def test_reserver_puis_annuler(app):
     connecter(c, "ines")
     r = post(c, "/reserver/D001")
     assert r.status_code == 302
-    assert "1er dans la file" in c.get("/compte").get_data(as_text=True)
+    assert "Vous êtes le 1er à l'attendre" in c.get("/compte").get_data(as_text=True)
     post(c, "/annuler/D001", page="/compte")
     assert "Aucune réservation active" in c.get("/compte").get_data(as_text=True)
     # persistance : la base a ete sauvegardee
@@ -227,3 +227,40 @@ def test_catalogue_genre_inconnu_ignore(lea):
 def test_compte_affiche_les_suggestions(lea):
     page = lea.get("/compte").get_data(as_text=True)
     assert "Pour vous" in page
+
+
+# ------------------------------------------------ retours du panel UX
+def test_guichet_saisie_libre_et_message_complet(admin, app):
+    post(admin, "/admin/emprunt", page="/admin", id_document="d005 — Design Patterns",
+         numero="A003 Petit")
+    page = admin.get("/admin").get_data(as_text=True)
+    assert "Prêt enregistré : « Design Patterns » pour Ines PETIT (A003)" in page
+
+
+def test_retour_dit_pour_qui_mettre_de_cote(app, admin):
+    c = app.test_client()
+    connecter(c, "ines")
+    post(c, "/reserver/D001")                       # D001 est chez lea
+    post(admin, "/admin/retour", page="/admin?onglet=retour", id_document="D001")
+    page = admin.get("/admin").get_data(as_text=True)
+    assert "mettez-le de côté pour Ines PETIT (A003)" in page
+
+
+def test_bouton_reserver_remplace_quand_limite_atteinte(app):
+    m = app.extensions["mediatheque"]
+    for i, id_doc in enumerate(("D002", "D003", "D004")):
+        if m.disponible(id_doc):
+            m.emprunter(id_doc, "A002")
+        m.reserver(id_doc, "A003")
+    c = app.test_client()
+    connecter(c, "ines")
+    assert "3 réservations en cours" in c.get("/catalogue").get_data(as_text=True)
+
+
+def test_recherche_sans_accents_depuis_le_site(lea):
+    assert "Clean Code" in lea.get("/catalogue?q=MARTIN").get_data(as_text=True)
+
+
+def test_lien_d_evitement(lea):
+    page = lea.get("/catalogue").get_data(as_text=True)
+    assert 'href="#contenu"' in page and 'id="contenu"' in page

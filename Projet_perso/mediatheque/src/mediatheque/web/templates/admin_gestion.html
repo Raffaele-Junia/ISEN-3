@@ -17,6 +17,12 @@
 {% if onglet == 'documents' %}
   <section class="carte col-large" aria-labelledby="h-list">
     <div class="carte-titre"><h2 id="h-list">Documents</h2><span class="surtitre">par ordre alphabétique</span></div>
+    <form class="recherche recherche-gestion" method="get" action="{{ url_for('gestion') }}" role="search">
+      <label for="q-gestion" class="sr">Chercher dans le fonds</label>
+      <input id="q-gestion" name="q" type="search" value="{{ q }}" maxlength="100" placeholder="Titre, auteur, n° d'inventaire…">
+      <button class="btn second" type="submit">Chercher</button>
+      {% if q %}<a class="effacer-filtre" href="{{ url_for('gestion') }}">Tout afficher</a>{% endif %}
+    </form>
     <div class="defile">
       <table>
         <thead><tr><th>Cote</th><th>Titre</th><th>Année</th><th>État</th><th><span class="sr">Actions</span></th></tr></thead>
@@ -28,9 +34,12 @@
             <td class="mono">{{ d.annee }}</td>
             <td>{% if statut != 'disponible' %}<span class="tampon {{ statut }}">{{ {'emprunte': 'Sorti', 'reserve': 'Réservé'}[statut] }}</span>{% else %}<span class="muted small">en rayon</span>{% endif %}</td>
             <td class="actions">
-              <form method="post" action="{{ url_for('admin_supprimer_document', id_document=d.id) }}">{{ jeton() }}
-                <button class="btn second petit" type="submit" aria-label="Retirer {{ d.titre }} du fonds">Retirer</button>
-              </form>
+              <details class="confirmer">
+                <summary class="btn second petit" aria-label="Retirer {{ d.titre }} du fonds">Retirer</summary>
+                <form method="post" action="{{ url_for('admin_supprimer_document', id_document=d.id) }}">{{ jeton() }}
+                  <button class="btn petit danger" type="submit">Oui, retirer « {{ d.titre }} »</button>
+                </form>
+              </details>
             </td>
           </tr>
         {% endfor %}
@@ -50,7 +59,7 @@
         <div class="champ"><label for="f-annee">Année</label><input id="f-annee" name="annee" inputmode="numeric" required pattern="[0-9]{1,4}" placeholder="2024"></div>
       </div>
       <div class="champ"><label for="f-titre">Titre</label><input id="f-titre" name="titre" required maxlength="200"></div>
-      <div class="champ"><label for="f-extra">Auteur, durée ou numéro</label><input id="f-extra" name="extra" required maxlength="200">
+      <div class="champ"><label for="f-extra">Auteur (livre) · durée en minutes (film) · numéro (revue)</label><input id="f-extra" name="extra" required maxlength="200">
         <span class="aide">L'auteur pour un livre, la durée en minutes pour un film, le numéro pour une revue.</span></div>
       <div class="champ"><label for="f-genre">Genre</label><input id="f-genre" name="genre" maxlength="60" list="liste-genres" placeholder="ex. Roman contemporain">
         <datalist id="liste-genres">{% for nom, _ in genres %}<option value="{{ nom }}"></option>{% endfor %}</datalist></div>
@@ -75,7 +84,7 @@
             <td><strong>{{ a.nom_complet }}</strong></td>
             <td>{{ a.type|capitalize }}<span class="sous mono">{{ c.emprunts|length }}/{{ a.quota }} sortis</span></td>
             <td>{% if retards %}<span class="tampon retard">{{ retards|length }} retard{{ 's' if retards|length > 1 }}</span>{% endif %}
-                {% if c.reservations %}<span class="tampon reserve">{{ c.reservations|length }} résa</span>{% endif %}
+                {% if c.reservations %}<span class="tampon reserve">{{ c.reservations|length }} réservation{{ 's' if c.reservations|length > 1 }}</span>{% endif %}
                 {% if not retards and not c.reservations %}<span class="muted small">rien à signaler</span>{% endif %}</td>
           </tr>
         {% endfor %}

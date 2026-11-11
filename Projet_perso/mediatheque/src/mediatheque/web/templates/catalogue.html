@@ -16,13 +16,14 @@
     <input id="q" name="q" type="search" placeholder="Un titre, un auteur, un thème…" value="{{ texte }}" maxlength="100">
     {% if type_doc %}<input type="hidden" name="type" value="{{ type_doc }}">{% endif %}
     {% if genre %}<input type="hidden" name="genre" value="{{ genre }}">{% endif %}
+    {% if public %}<input type="hidden" name="public" value="{{ public }}">{% endif %}
     <button class="btn" type="submit">Chercher</button>
   </div>
   <nav class="intercalaires" aria-label="Type de document">
-    <a href="{{ url_for('catalogue', q=texte or None) }}" {% if not type_doc and not genre %}aria-current="true"{% endif %}>Tout</a>
-    <a href="{{ url_for('catalogue', q=texte or None, type='livre') }}" {% if type_doc == 'livre' %}aria-current="true"{% endif %}>Livres</a>
-    <a href="{{ url_for('catalogue', q=texte or None, type='dvd') }}" {% if type_doc == 'dvd' %}aria-current="true"{% endif %}>Films</a>
-    <a href="{{ url_for('catalogue', q=texte or None, type='revue') }}" {% if type_doc == 'revue' %}aria-current="true"{% endif %}>Presse</a>
+    <a href="{{ url_for('catalogue', q=texte or None, genre=genre, public=public) }}" {% if not type_doc %}aria-current="true"{% endif %}>Tout</a>
+    <a href="{{ url_for('catalogue', q=texte or None, type='livre', genre=genre, public=public) }}" {% if type_doc == 'livre' %}aria-current="true"{% endif %}>Livres</a>
+    <a href="{{ url_for('catalogue', q=texte or None, type='dvd', genre=genre, public=public) }}" {% if type_doc == 'dvd' %}aria-current="true"{% endif %}>Films</a>
+    <a href="{{ url_for('catalogue', q=texte or None, type='revue', genre=genre, public=public) }}" {% if type_doc == 'revue' %}aria-current="true"{% endif %}>Presse</a>
   </nav>
 </form>
 
@@ -32,19 +33,29 @@
     <summary>
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 5h18l-7 8v6l-4-2v-4z"/></svg>
       Filtrer par genre
-      {% if genre %}<span class="filtre-actif">{{ genre }}</span>{% else %}<span class="filtre-nb">{{ genres|length }}</span>{% endif %}
+      {% if genre %}<span class="filtre-actif">{{ genre }}</span>{% else %}<span class="filtre-nb">{{ genres|length }} genres</span>{% endif %}
     </summary>
     <nav class="genres" aria-label="Genres">
       {% for nom, nb in genres %}
-        <a href="{{ url_for('catalogue', genre=nom, q=texte or None) }}" {% if genre == nom %}aria-current="true"{% endif %}>{{ nom }} <span>{{ nb }}</span></a>
+        <a href="{{ url_for('catalogue', genre=nom, q=texte or None, type=type_doc, public=public) }}" {% if genre == nom %}aria-current="true"{% endif %}>{{ nom }} <span>{{ nb }}</span></a>
       {% endfor %}
     </nav>
   </details>
-  {% if genre %}<a class="effacer-filtre" href="{{ url_for('catalogue', q=texte or None, type=type_doc) }}">Retirer le filtre « {{ genre }} »</a>{% endif %}
+  {% if genre %}<a class="effacer-filtre" href="{{ url_for('catalogue', q=texte or None, type=type_doc, public=public) }}">Retirer le filtre « {{ genre }} »</a>{% endif %}
 </div>
 {% endif %}
 
-{% if texte or type_doc or genre %}<p class="compte-resultats">{{ lignes|length }} résultat{{ 's' if lignes|length > 1 }}{% if texte %} pour « {{ texte }} »{% endif %}{% if genre %} · {{ genre }}{% endif %}</p>{% endif %}
+{% if publics %}
+<nav class="pour-qui" aria-label="Pour qui ?">
+  <span class="pour-qui-titre">Pour qui&nbsp;?</span>
+  <a href="{{ url_for('catalogue', q=texte or None, type=type_doc, genre=genre) }}" {% if not public %}aria-current="true"{% endif %}>Tout le monde</a>
+  {% for cle, libelle, nb in publics %}
+    <a href="{{ url_for('catalogue', q=texte or None, type=type_doc, genre=genre, public=cle) }}" {% if public == cle %}aria-current="true"{% endif %}>{{ libelle }}</a>
+  {% endfor %}
+</nav>
+{% endif %}
+
+{% if texte or type_doc or genre or public %}<p class="compte-resultats">{{ lignes|length }} résultat{{ 's' if lignes|length > 1 }}{% if texte %} pour « {{ texte }} »{% endif %}{% if genre %} · {{ genre }}{% endif %}</p>{% endif %}
 
 {% if lignes %}
 <div class="etagere">
