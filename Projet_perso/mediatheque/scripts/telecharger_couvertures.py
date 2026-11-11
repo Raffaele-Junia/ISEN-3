@@ -12,6 +12,7 @@
 """
 import argparse
 import json
+import re
 import sys
 import time
 import urllib.error
@@ -28,14 +29,43 @@ IMAGE = "https://covers.openlibrary.org/b/id/{}-L.jpg?default=false"
 ENTETES = {"User-Agent": "MediathequeDesTilleuls/0.1 (projet etudiant ISEN)"}
 TAILLE_MAX = 2 * 1024 * 1024
 PAUSE_S = 0.4
+DUREE_MAX_S = 30
+# Seuls ces domaines (et leurs sous-domaines) sont contactes, en HTTPS (F4).
+HOTES_AUTORISES = ("openlibrary.org", "archive.org")
+_FORMAT_ID = re.compile(r"D\d{1,6}")
+
+
+def url_autorisee(url):
+    parties = urllib.parse.urlsplit(url)
+    hote = (parties.hostname or "").lower()
+    return parties.scheme == "https" and any(
+        hote == h or hote.endswith("." + h) for h in HOTES_AUTORISES)
+
+
+class _RedirectionsSures(urllib.request.HTTPRedirectHandler):
+    """Refuse toute redirection hors HTTPS ou hors des domaines autorises (F4)."""
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        if not url_autorisee(newurl):
+            raise ValueError(f"redirection refusee vers {newurl}")
+        return super().redirect_request(req, fp, code, msg, headers, newurl)
+
+
+# urlopen passe desormais par ce gestionnaire de redirections (script autonome).
+urllib.request.install_opener(urllib.request.build_opener(_RedirectionsSures))
 
 
 def lire(url, limite=TAILLE_MAX):
+    if not url_autorisee(url):
+        raise ValueError(f"adresse non autorisee : {url}")
+    debut = time.monotonic()
     requete = urllib.request.Request(url, headers=ENTETES)
     with urllib.request.urlopen(requete, timeout=20) as reponse:
         donnees = reponse.read(limite + 1)
         if len(donnees) > limite:
             raise ValueError("reponse trop volumineuse")
+        if time.monotonic() - debut > DUREE_MAX_S:
+            raise TimeoutError("telechargement trop long")
         return donnees, reponse.headers.get_content_type()
 
 
@@ -78,8 +108,14 @@ def main():
     m = Mediatheque.charger(args.depuis)
     livres = [d for d in sorted(m, key=lambda d: d.id) if d.CLE == "livre"]
     ok = deja = absents = erreurs = 0
+    dossier = DOSSIER.resolve()
     for livre in livres:
-        cible = DOSSIER / f"{livre.id}.jpg"
+        cible = (DOSSIER / f"{livre.id}.jpg").resolve()
+        # F3 : identifiant au format attendu ET fichier strictement dans le dossier
+        if not _FORMAT_ID.fullmatch(livre.id) or cible.parent != dossier:
+            erreurs += 1
+            print(f"  !! identifiant refuse : {livre.id!r}", file=sys.stderr)
+            continue
         if cible.exists() and not args.forcer:
             deja += 1
             continue

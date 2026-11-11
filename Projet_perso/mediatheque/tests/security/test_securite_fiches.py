@@ -306,8 +306,6 @@ def _data_avec_identifiant(dossier, ident):
         "id_document,numero_adherent,date_emprunt,date_retour\n", encoding="utf-8")
 
 
-@pytest.mark.xfail(strict=True, reason="faille F3 : le script ecrit hors de static/couvertures "
-                   "si un identifiant du fonds contient ../ (aucun controle a l'import)")
 def test_f3_script_n_ecrit_pas_hors_du_dossier(monkeypatch, tmp_path):
     s = _script()
     _simuler(monkeypatch)
@@ -358,8 +356,6 @@ def serveurs_locaux():
         srv.server_close()
 
 
-@pytest.mark.xfail(strict=True, reason="faille F4 : le script suit toute redirection "
-                   "(autre hote, http en clair) sans liste d'hotes autorises")
 def test_f4_script_ne_suit_pas_une_redirection_vers_un_autre_hote(serveurs_locaux):
     s = _script()
     try:

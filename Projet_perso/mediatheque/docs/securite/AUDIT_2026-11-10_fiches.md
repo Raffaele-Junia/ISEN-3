@@ -41,3 +41,15 @@ Les audits précédents (`AUDIT_2026-11-10.md` et `AUDIT_2026-11-10_web.md`) son
 `tests/security/test_securite_fiches.py` : 43 tests, dont 37 passent (points sains) et 6 sont marqués `xfail(strict=True)` comme preuves de F1 (2 tests), F2, F3, F4 et F5. Le script de téléchargement n'est jamais exécuté contre Internet : `urllib.request.urlopen` est simulé, et le test F4 utilise deux serveurs HTTP locaux sur 127.0.0.1.
 
 Suite complète (`uv run --system-certs pytest -q -p no:cacheprovider`) : **321 passed, 6 xfailed**.
+
+## Corrections (2026-11-11)
+
+| # | Statut | Correctif |
+|---|---|---|
+| F1 | Corrigée | Co-emprunts anonymisés : le demandeur n'est jamais compté, et une paire n'existe qu'à partir de 3 **autres** lecteurs (`SEUIL_ANONYMAT`, classe `CoEmprunts`). |
+| F2 | Corrigée | Index du fonds par genre, thème, auteur et revue : on ne compare que les candidats liés. 10 lectures récentes au plus. Co-emprunts mis en cache et recalculés à chaque nouveau prêt. « Pour vous » sur `data_demo` : environ 5 ms. |
+| F3 | Corrigée | Le script refuse tout identifiant hors du format `D\d{1,6}` et tout fichier qui sortirait de `static/couvertures/`. |
+| F4 | Corrigée | Seuls les domaines openlibrary.org et archive.org sont contactés, en HTTPS, y compris après une redirection. La durée de téléchargement est bornée. |
+| F5 | Corrigée | Un thème contenant `|` est refusé. Les blancs et les retours à la ligne sont normalisés. |
+
+Les preuves `xfail` ont été retirées : la suite complète donne 327 tests réussis.
