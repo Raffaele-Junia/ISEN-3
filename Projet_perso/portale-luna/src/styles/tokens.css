@@ -1,0 +1,61 @@
+:root {
+  /* Scale: 1 design px. Desktop is designed at 1440 × 900, shrinking to fit below 760 design px of height. */
+  --u: min(calc(100vw / 1440), calc(100svh / 760));
+
+  /* Colors */
+  --white: #ffffff;
+  --ink: #151515;
+  --ink-button: #161616;
+  --ink-header: #161515;
+  --grey: #717171;
+  --steel: #a9aebb;
+  --glass: rgba(168, 168, 168, 0.2);
+  --glass-edge: rgba(255, 255, 255, 0.2);
+  --glass-shine: rgba(255, 255, 255, 0.25);
+  --sky-tint: rgba(0, 0, 0, 0.4);
+  --cursor-fill: rgba(255, 255, 255, 0.2);
+  --cursor-edge: rgba(255, 255, 255, 0.6);
+
+  /* Type */
+  --font-sans: "Geist", "Helvetica Neue", Arial, sans-serif;
+  --fit: 0.915;
+  --fit-display: 0.93;
+  --cap: 0.71;
+  --display-size: calc(96 * var(--fit-display) * var(--u));
+  --display-leading: calc(91.5 * var(--u));
+  --body-size: calc(20 * var(--fit) * var(--u));
+  --body-leading: calc(23 * var(--u));
+  --small-size: calc(16 * var(--fit) * var(--u));
+  --nav-size: calc(14 * var(--fit) * var(--u));
+  --ui-size: calc(16 * var(--fit) * var(--u));
+  --counter-size: calc(28 * var(--fit) * var(--u));
+  --card-text-size: calc(40px * var(--fit));
+  --brand-nav-size: calc(16 / var(--cap) * var(--u));
+
+  /* Spacing and shape */
+  --edge: calc(20 * var(--u));
+  --bottom: calc(40 * var(--u));
+  --pill: 100px;
+  --radius-s: 2px;
+  --h-pill: calc(39 * var(--u));
+  --h-cta: calc(39 * var(--u));
+  --h-button: calc(47 * var(--u));
+  --icon: calc(23 * var(--u));
+
+  /* Motion */
+  --ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --fast: 200ms;
+  --theme: 400ms;
+}
+
+@media (max-width: 1023px) {
+  :root {
+    --u: min(calc(100vw / 415), calc(100svh / 760));
+    --display-size: calc(48 * var(--fit-display) * var(--u));
+    --display-leading: calc(45.75 * var(--u));
+    --body-size: calc(18 * var(--fit) * var(--u));
+    --body-leading: calc(20.7 * var(--u));
+    --ui-size: calc(14 * var(--fit) * var(--u));
+    --h-cta: calc(38 * var(--u));
+  }
+}

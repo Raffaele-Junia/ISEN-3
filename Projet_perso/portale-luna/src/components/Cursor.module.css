@@ -1,0 +1,17 @@
+.cursor {
+  position: fixed;
+  left: 0;
+  top: 0;
+  z-index: 30;
+  width: calc(32 * var(--u));
+  height: calc(32 * var(--u));
+  margin: calc(-16 * var(--u)) 0 0 calc(-16 * var(--u));
+  border: 1px solid var(--cursor-edge);
+  border-radius: 50%;
+  background: var(--cursor-fill);
+  backdrop-filter: blur(4px) brightness(0.82);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity var(--fast) linear;
+  will-change: transform;
+}

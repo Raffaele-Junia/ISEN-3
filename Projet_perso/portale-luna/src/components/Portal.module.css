@@ -1,0 +1,147 @@
+.media,
+.over {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  transform: scale(0);
+  transform-origin: 50% 50%;
+}
+
+.media {
+  z-index: 1;
+}
+
+.over {
+  z-index: 3;
+  pointer-events: none;
+}
+
+/* The picture, placed so that the slab's centre (--card-cy of the way down it) sits at a set height on screen */
+.photo {
+  position: absolute;
+  --img-w: max(calc(1612 * var(--u)), 100vw, calc(100svh * 1.154 * 4096 / 2640));
+  width: var(--img-w);
+  aspect-ratio: 4096 / 2640;
+  left: calc(50% - var(--img-w) / 2);
+  top: calc(49.87% - var(--img-w) * 2640 / 4096 * var(--card-cy));
+}
+
+.image {
+  width: 100%;
+  height: 100%;
+}
+
+/* The card plane: 652 × 1024 card px, mapped onto the slab's corners with one matrix3d */
+.plane {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 652px;
+  height: 1024px;
+  transform-origin: 0 0;
+  will-change: transform;
+}
+
+.light {
+  opacity: 0;
+  filter: drop-shadow(0 0 3px rgba(255, 255, 255, 0.95)) drop-shadow(0 0 14px rgba(255, 255, 255, 0.55));
+  mask-image: linear-gradient(to bottom left, #000 20%, rgba(0, 0, 0, 0.45) 60%, transparent 92%);
+}
+
+/* The landscape card face (1024 × 652), turned upright */
+.face {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 1024px;
+  height: 652px;
+  transform-origin: 0 0;
+  transform: translateX(652px) rotate(90deg);
+  color: var(--white);
+}
+
+.face::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border: 3px solid var(--white);
+  border-radius: 28px;
+}
+
+.brand {
+  position: absolute;
+  right: 58.3px;
+  top: 58px;
+  display: block;
+  margin-right: -0.16em;
+  --lh: 1em;
+  font-size: 66px;
+  font-weight: 400;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.chip {
+  position: absolute;
+  left: 58px;
+  top: 270px;
+  width: 115.912px;
+  height: 111.796px;
+}
+
+.name,
+.number {
+  position: absolute;
+  top: 565px;
+  display: block;
+  --lh: 1em;
+  font-size: var(--card-text-size);
+  font-weight: 400;
+  white-space: nowrap;
+}
+
+.name {
+  left: 59px;
+  letter-spacing: -0.01em;
+}
+
+.number {
+  right: 58px;
+  letter-spacing: 0.01em;
+}
+
+/* The portal */
+.fill,
+.rim {
+  position: absolute;
+  inset: 0;
+  border-radius: 28px;
+  opacity: 0;
+}
+
+.fill {
+  background: var(--white);
+}
+
+.rim {
+  border: 16px solid var(--white);
+  box-shadow:
+    0 0 36px 8px rgba(255, 255, 255, 0.85),
+    inset 0 0 28px 6px rgba(255, 255, 255, 0.7);
+}
+
+@media (max-width: 1023px) {
+  .photo {
+    --img-w: max(calc(1462 * min(calc(100vw / 415), calc(100svh / 900))), 100vw, calc(100svh * 1.049 * 4096 / 2640));
+    left: calc(50% + 8.5 * var(--u) - var(--img-w) / 2);
+    top: calc(54.43% - var(--img-w) * 2640 / 4096 * var(--card-cy));
+  }
+
+  .photo::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(to bottom, var(--sky-tint) 3.99%, transparent 33.78%);
+  }
+}

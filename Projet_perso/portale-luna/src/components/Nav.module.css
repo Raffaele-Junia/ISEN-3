@@ -1,0 +1,159 @@
+.nav {
+  position: fixed;
+  inset: 0 0 auto 0;
+  z-index: 20;
+  height: 0;
+  color: var(--white);
+  opacity: 0;
+  transition: color var(--theme) var(--ease);
+}
+
+.nav[data-theme="dark"] {
+  color: var(--ink);
+}
+
+.brand {
+  position: absolute;
+  left: var(--edge);
+  top: calc(33 * var(--u));
+  display: block;
+  --lh: 1em;
+  font-size: var(--brand-nav-size);
+  font-weight: 500;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: inherit;
+}
+
+/* The glass pill with the five links */
+.links {
+  position: absolute;
+  left: 50%;
+  top: var(--edge);
+  transform: translateX(-50%);
+  display: flex;
+  gap: calc(31 * var(--u));
+  padding: calc(16 * var(--u)) calc(20 * var(--u));
+  border-radius: var(--pill);
+  background: var(--glass);
+  backdrop-filter: blur(20px);
+  box-shadow: inset 0 2px 2px var(--glass-shine);
+}
+
+.link {
+  position: relative;
+  display: block;
+  --lh: 1.2em;
+  font-size: var(--nav-size);
+  font-weight: 300;
+  letter-spacing: -0.02em;
+  white-space: nowrap;
+  transition: opacity var(--fast) var(--ease);
+}
+
+.link::after {
+  content: "";
+  position: absolute;
+  left: 1px;
+  top: calc(100% + 4 * var(--u));
+  width: calc(12 * var(--u));
+  height: 1px;
+  border-radius: var(--radius-s);
+  background: currentColor;
+  opacity: 0;
+  transition: opacity var(--theme) var(--ease);
+}
+
+.link[data-active]::after {
+  opacity: 1;
+}
+
+.link:hover {
+  opacity: 0.6;
+}
+
+/* Account and the header's button */
+.right {
+  position: absolute;
+  right: var(--edge);
+  top: calc(22 * var(--u));
+  display: flex;
+  align-items: center;
+  gap: calc(8 * var(--u));
+}
+
+.account,
+.cta {
+  display: flex;
+  align-items: center;
+  border-radius: var(--pill);
+  --lh: 1.2em;
+  font-size: var(--ui-size);
+  font-weight: 300;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+}
+
+.account > span,
+.cta > span {
+  display: block;
+}
+
+.account {
+  height: var(--h-pill);
+  padding: 0 calc(12 * var(--u)) 0 calc(8 * var(--u));
+  gap: calc(3.9 * var(--u));
+  background: var(--glass);
+  border: 1px solid var(--glass-edge);
+  backdrop-filter: blur(20px);
+  box-shadow: inset 0 2px 2px var(--glass-shine);
+  transition: opacity var(--fast) var(--ease);
+}
+
+.account:hover {
+  opacity: 0.8;
+}
+
+.icon {
+  width: var(--icon);
+  height: var(--icon);
+  flex: none;
+}
+
+.cta {
+  height: var(--h-cta);
+  padding: 0 calc(16 * var(--u));
+  background: var(--white);
+  color: var(--ink-header);
+  transition:
+    background-color var(--theme) var(--ease),
+    color var(--theme) var(--ease),
+    transform var(--fast) var(--ease);
+}
+
+.nav[data-theme="dark"] .cta {
+  background: var(--ink-button);
+  color: var(--white);
+}
+
+.cta:hover {
+  transform: scale(1.03);
+}
+
+@media (max-width: 1023px) {
+  .brand {
+    top: calc(31.5 * var(--u));
+  }
+
+  .links {
+    display: none;
+  }
+
+  .right {
+    top: var(--edge);
+  }
+
+  .account {
+    gap: calc(6 * var(--u));
+  }
+}

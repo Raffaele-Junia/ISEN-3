@@ -1,0 +1,201 @@
+.ready {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  background: var(--white);
+  color: var(--ink);
+  opacity: 0;
+  visibility: hidden;
+}
+
+/* Everything inside starts hidden: the reveal shows it */
+.wordmark,
+.card,
+.line,
+.more,
+.text,
+.cta,
+.scroll {
+  opacity: 0;
+}
+
+.wordmark {
+  position: absolute;
+  left: var(--edge);
+  right: var(--edge);
+  top: calc(406 * var(--u));
+  transform: translateY(-50%);
+}
+
+.mark {
+  display: block;
+  width: 100%;
+  height: auto;
+  opacity: 0.1;
+}
+
+.card {
+  position: absolute;
+  left: 50%;
+  top: calc(380 * var(--u));
+  z-index: 1;
+  width: calc(1600 * var(--u));
+  aspect-ratio: 16 / 9;
+  transform: translate(-50%, -50%);
+  perspective: 1200px;
+  pointer-events: none;
+}
+
+.float,
+.image {
+  width: 100%;
+  height: 100%;
+}
+
+.heading {
+  font-size: var(--display-size);
+  font-weight: 400;
+  letter-spacing: -0.02em;
+}
+
+.line {
+  position: absolute;
+  display: block;
+  --lh: 1em;
+  white-space: nowrap;
+}
+
+.word {
+  display: inline-block;
+}
+
+.first {
+  left: var(--edge);
+  top: calc(232 * var(--u) - var(--cap) * var(--display-size));
+}
+
+.second {
+  right: var(--edge);
+  top: calc(644 * var(--u) - var(--cap) * var(--display-size));
+  z-index: 2;
+}
+
+.more {
+  position: absolute;
+  right: var(--edge);
+  top: calc(150 * var(--u));
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: calc(8 * var(--u));
+  height: var(--h-pill);
+  padding: 0 calc(12 * var(--u)) 0 calc(8 * var(--u));
+  border-radius: var(--pill);
+  background: var(--steel);
+  color: var(--white);
+  --lh: 1.2em;
+  font-size: var(--ui-size);
+  font-weight: 300;
+  letter-spacing: -0.01em;
+  transition: transform var(--fast) var(--ease);
+}
+
+.more > span,
+.cta > span {
+  display: block;
+}
+
+.icon {
+  width: var(--icon);
+  height: var(--icon);
+  flex: none;
+}
+
+.text {
+  position: absolute;
+  left: var(--edge);
+  bottom: calc(127 * var(--u));
+  z-index: 2;
+  width: calc(453 * var(--u));
+  --lh: var(--body-leading);
+  font-size: var(--body-size);
+  font-weight: 400;
+  letter-spacing: -0.01em;
+}
+
+.cta {
+  position: absolute;
+  left: var(--edge);
+  bottom: var(--bottom);
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: var(--h-button);
+  padding: 0 calc(18 * var(--u));
+  border-radius: var(--pill);
+  background: var(--ink-button);
+  color: var(--white);
+  --lh: 1.2em;
+  font-size: var(--small-size);
+  font-weight: 400;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+  transition: transform var(--fast) var(--ease);
+}
+
+.more:hover,
+.cta:hover {
+  transform: scale(1.03);
+}
+
+.scroll {
+  position: absolute;
+  right: var(--edge);
+  bottom: var(--bottom);
+  --lh: 1em;
+  font-size: var(--body-size);
+  font-weight: 400;
+  letter-spacing: -0.01em;
+  color: var(--grey);
+  white-space: nowrap;
+}
+
+@media (max-width: 1023px) {
+  .wordmark {
+    top: calc(400 * var(--u));
+  }
+
+  .card {
+    top: calc(400 * var(--u));
+    width: calc(830 * var(--u));
+  }
+
+  .first {
+    top: calc(167 * var(--u) - var(--cap) * var(--display-size));
+  }
+
+  .more {
+    top: calc(190 * var(--u));
+  }
+
+  .second {
+    top: auto;
+    bottom: calc(116 * var(--u) + 2 * var(--body-leading) + var(--cap) * var(--body-size) + 44 * var(--u));
+  }
+
+  .text {
+    right: var(--edge);
+    bottom: calc(116 * var(--u));
+    width: auto;
+    max-width: calc(375 * var(--u));
+  }
+
+  .cta {
+    right: var(--edge);
+  }
+
+  .scroll {
+    display: none;
+  }
+}
