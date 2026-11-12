@@ -28,6 +28,13 @@ A2 = DH(q2, 0, 0, sp.pi/2)
 # Ligne 3 : q = q3, d = 0, a = a3, alpha = 0
 A3 = DH(0,d3,0,0)
 
+print("A1:")
+sp.pprint(A1)
+print("A2:")
+sp.pprint(A2)
+print("A1:")
+sp.pprint(A3)
+
 # ==========================
 # 4. Modèle Géométrique Direct (T03)
 # ==========================
