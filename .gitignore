@@ -10,6 +10,9 @@ venv/
 build/
 dist/
 
+# --- Node (dépendances installées par npm, quel que soit le projet)
+node_modules/
+
 # --- Secrets et configuration locale (garder seulement les modèles *.exemple)
 .env
 .env.*
