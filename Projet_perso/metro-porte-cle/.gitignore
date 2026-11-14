@@ -1,0 +1,4 @@
+# Identifiants WiFi : seul le modèle secrets.example.h est versionné
+firmware/MetroPorteCle/secrets.h
+# Sorties de compilation Arduino
+firmware/MetroPorteCle/build/
